@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tabellenkalkulation</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#fff;color:#1f2430;}
+  #bar{display:flex;gap:8px;align-items:center;padding:6px 10px;background:#f1f3f7;border-bottom:1px solid #dfe4ec;position:sticky;top:0;z-index:5;}
+  #bar .cellref{font-weight:700;min-width:44px;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;cursor:pointer;flex:none;}
+  #fx{flex:1;padding:6px 8px;border:1px solid #cfd6e0;border-radius:6px;font-size:15px;font-family:inherit;}
+  #bar .hint{font-size:11px;color:#8a93a2;white-space:nowrap;}
+  #wrap{position:absolute;top:44px;left:0;right:0;bottom:0;overflow:auto;}
+  body.kp-open #wrap{bottom:var(--kph,236px);}
+  #keypad{position:fixed;left:0;right:0;bottom:0;z-index:12;background:#eef1f6;border-top:1px solid #cfd6e0;padding:7px;display:none;flex-direction:column;gap:6px;box-shadow:0 -4px 16px rgba(0,0,0,.10);}
+  #keypad.show{display:flex;}
+  #keypad .kp-row{display:flex;gap:6px;}
+  #keypad .kp-row.chips{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+  #keypad button{flex:1 1 0;min-width:0;height:46px;border:1px solid #cfd6e0;background:#fff;border-radius:10px;font-size:18px;font-weight:600;font-family:inherit;color:#1f2430;cursor:pointer;touch-action:manipulation;padding:0;}
+  #keypad button:active{background:#dbe4f0;}
+  #keypad button.fn{flex:0 0 auto;height:38px;padding:0 13px;font-size:13px;font-weight:700;color:#2563eb;}
+  #keypad button.op{background:#f4f6fa;}
+  #keypad button.act{background:#3b82f6;border-color:#3b82f6;color:#fff;flex:1.5 1 0;}
+  #keypad button[data-act="abc"]{font-size:15px;font-weight:700;background:#f4f6fa;}
+  #keypad button.del{background:#fee2e2;border-color:#fca5a5;}
+  table{border-collapse:collapse;table-layout:fixed;}
+  th,td{border:1px solid #e2e7ef;padding:0;height:28px;}
+  th{background:#f7f9fc;color:#5b6472;font-weight:var(--fwm,600);font-size:calc(var(--fs,14px)*0.86);position:sticky;z-index:2;text-align:center;cursor:pointer;user-select:none;-webkit-user-select:none;overflow:hidden;}
+  th.hsel{background:#dbeafe;color:#1e40af;}
+  .colres{position:absolute;top:0;right:-5px;width:11px;height:100%;cursor:col-resize;touch-action:none;z-index:4;}
+  .colres:active{background:rgba(59,130,246,.35);}
+  thead th{top:0;position:sticky;}
+  tbody th{left:0;min-width:40px;width:40px;background:#f7f9fc;}
+  td input{width:100%;height:100%;border:0;outline:0;padding:2px 6px;font-size:var(--fs,14px);font-weight:var(--fw,400);font-style:var(--fi,normal);font-family:inherit;background:transparent;color:inherit;}
+  td.sel{outline:2px solid #3b82f6;outline-offset:-2px;}
+  td.rng{background:#dbeafe;}
+  #grid td{position:relative;}
+  #grid td.fpre{background:#bfdbfe;outline:1px dashed #3b82f6;outline-offset:-1px;}
+  #grid td.refsel{background:#dcfce7;outline:2px dashed #16a34a;outline-offset:-2px;}
+  #grid td.refhi{box-shadow:inset 0 0 0 2px var(--rc,#2563eb);}
+  #grid td.refhi input{color:var(--rc,#2563eb);}
+  #fmlOv{position:fixed;z-index:8;pointer-events:none;display:none;overflow:hidden;align-items:center;box-sizing:border-box;color:#1f2430;}
+  #fmlOv.show{display:flex;}
+  #fmlOv .ovInner{white-space:pre;flex:none;}
+  .fillh{position:absolute;right:-9px;bottom:-9px;width:19px;height:19px;background:#3b82f6;border:2px solid #fff;border-radius:4px;cursor:crosshair;z-index:4;touch-action:none;box-shadow:0 1px 3px rgba(0,0,0,.4);}
+  .fillh::after{content:'';position:absolute;inset:-9px;}   /* größere Trefferfläche für den Finger */
+  td input:focus{background:#eaf1ff;}
+  .num{text-align:right;}
+  #bar button.cbtn,#bar select.cbtn,#fileMenu button.cbtn{height:32px;padding:0 11px;border:1px solid #cfd6e0;border-radius:6px;background:#fff;font-size:13px;font-family:inherit;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;color:inherit;line-height:1;}
+  #bar select.cbtn{-webkit-appearance:none;appearance:none;padding:0 24px 0 10px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%235b6472' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;background-size:10px;}
+  #bar button.cbtn:hover{background:#eef2f8;}
+  #chartOv{position:absolute;top:44px;left:0;right:0;bottom:0;background:#fff;display:none;flex-direction:column;z-index:10;}
+  #chartOv.show{display:flex;}
+  #chartHead{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid #e2e7ef;background:#f7f9fc;gap:10px;}
+  #chartHead b{font-size:14px;}
+  #chartHead .tog{display:flex;gap:6px;align-items:center;}
+  #chartHead .cbtn.on{background:#3b82f6;color:#fff;border-color:#3b82f6;}
+  #chartClose{cursor:pointer;font-size:24px;line-height:1;color:#5b6472;padding:0 4px;}
+  #chartWrap{flex:1;position:relative;min-height:0;}
+  #chartCv{position:absolute;inset:0;width:100%;height:100%;}
+  #chartInfo{padding:6px 12px;font-size:12px;color:#334155;border-top:1px solid #e2e7ef;white-space:pre-wrap;min-height:18px;}
+  #chartOpt{display:none;flex-direction:column;gap:7px;padding:9px 12px;border-bottom:1px solid #e2e7ef;background:#fbfcfe;}
+  #chartOpt.show{display:flex;}
+  #chartOpt .corow{display:flex;align-items:center;gap:7px;font-size:13px;color:#334155;flex-wrap:wrap;}
+  #chartOpt .corow>span{color:#5b6472;}
+  #chartOpt .corow>span.lb{min-width:96px;font-weight:600;color:#334155;}
+  #chartOpt input{flex:1;min-width:70px;border:1px solid #cfd8e6;border-radius:8px;padding:6px 8px;font:inherit;font-size:13px;background:#fff;color:#1f2430;}
+  #chartPickBar{position:fixed;left:0;right:0;bottom:0;z-index:14;display:none;align-items:center;gap:10px;padding:9px 12px;
+    background:#1f2937;color:#fff;font-size:13px;box-shadow:0 -4px 16px rgba(0,0,0,.25);}
+  #chartPickBar.show{display:flex;}
+  #chartPickBar b{flex:1;font-weight:600;}
+  #chartPickBar button{border:none;border-radius:9px;padding:8px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;background:#e5e7eb;color:#1f2430;}
+  #chartPickBar button.pri{background:#3b82f6;color:#fff;}
+  #toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#1f2430;color:#fff;padding:8px 14px;border-radius:9px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:30;max-width:90%;text-align:center;}
+  #toast.show{opacity:1;}
+  #bar .cbtn.on{background:#3b82f6;color:#fff;border-color:#3b82f6;}
+  #wrap.noscroll{touch-action:none;}
+  #fileWrap{position:relative;display:inline-flex;}
+  #fileMenu{position:absolute;top:38px;right:0;background:#fff;border:1px solid #cfd6e0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;display:none;flex-direction:column;gap:4px;z-index:20;}
+  #fileMenu.show{display:flex;}
+  #fileMenu .cbtn{justify-content:flex-start;white-space:nowrap;}
+  #bar{flex-wrap:nowrap;}
+  #bar #fx{min-width:90px;}
+  #bar .cbtn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+  #bar .cbtn:disabled{opacity:.38;cursor:default;}
+  @media (max-width:920px){ #bar .lbl{display:none;} #bar select.cbtn{padding:0 22px 0 8px;} }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span class="cellref" id="cellref">A1</span>
+  <input id="fx" placeholder="Wert oder = Formel (z. B. =A1+B2*2, =summe(A1:A5), =zählenwenn(A1:A9;&quot;&gt;3&quot;))">
+  <button class="cbtn" id="fxGo" title="Eingabe übernehmen (wie Enter)">✓</button>
+  <button class="cbtn" id="btnUndo" title="Rückgängig"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+  <button class="cbtn" id="btnRedo" title="Wiederherstellen"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+  <button class="cbtn on" id="btnTouch" title="Finger: Zellen auswählen/ausfüllen  ⇄  Tabelle scrollen">👆 Auswählen</button>
+  <select id="rowSel" class="cbtn" title="Anzahl der Zeilen"><option value="60">60 Zeilen</option><option value="100">100 Zeilen</option><option value="200">200 Zeilen</option><option value="500">500 Zeilen</option><option value="1000">1000 Zeilen</option></select>
+  <button class="cbtn" id="btnFsM" title="Schrift kleiner">A−</button>
+  <button class="cbtn" id="btnFsP" title="Schrift größer">A+</button>
+  <button class="cbtn" id="btnKeys" title="Formel-Tastatur ein-/ausblenden (mit ABC zurück zur Buchstaben-Tastatur)">⌨<span class="lbl"> Formeln</span></button>
+  <button class="cbtn" id="btnChart" title="Markierte Zahlen als Diagramm anzeigen">📊<span class="lbl"> Diagramm</span></button>
+  <span id="fileWrap">
+    <button class="cbtn" id="btnFile" title="Öffnen, speichern, einfügen">📁<span class="lbl"> Datei</span> ▾</button>
+    <div id="fileMenu">
+      <button class="cbtn" id="btnNew">📄 Neu (leere Tabelle)</button>
+      <button class="cbtn" id="btnOpen">📂 Öffnen (Tabelle, CSV, Excel)</button>
+      <button class="cbtn" id="btnSave">💾 Tabelle speichern</button>
+      <button class="cbtn" id="btnCsv">⤓ Als CSV speichern</button>
+      <button class="cbtn" id="btnPaste">📋 Aus Zwischenablage einfügen</button>
+      <button class="cbtn" id="btnClear">🗑 Alles löschen</button>
+    </div>
+  </span>
+</div>
+<input type="file" id="fileImp" accept=".json,.tabelle,.csv,.tsv,.txt,.xlsx,text/csv,application/json" style="display:none">
+<div id="wrap"><table id="grid"></table></div>
+<div id="keypad"></div>
+<div id="toast"></div>
+<div id="chartPickBar"><b id="chartPickTxt">Bereich markieren</b><button id="chartPickCancel">Abbrechen</button><button class="pri" id="chartPickOk">Übernehmen</button></div>
+<div id="chartOv">
+  <div id="chartHead">
+    <b id="chartTitle">Diagramm</b>
+    <span class="tog">
+      <button class="cbtn" id="chartBar">Säulen</button>
+      <button class="cbtn" id="chartPie">Kreis</button>
+      <button class="cbtn" id="chartBox">Boxplot</button>
+      <button class="cbtn" id="chartOptBtn" title="Achsen und Beschriftung einstellen">⚙<span class="lbl"> Achsen</span></button>
+      <button class="cbtn" id="chartFsM" title="Beschriftung kleiner">A−</button>
+      <button class="cbtn" id="chartFsP" title="Beschriftung größer">A+</button>
+      <span id="chartClose" title="Schließen">×</span>
+    </span>
+  </div>
+  <div id="chartOpt">
+    <div class="corow"><span class="lb">Rubriken (x)</span><input id="coCat" placeholder="z. B. A1:A8"><button class="cbtn" id="coCatPick">Markieren</button></div>
+    <div class="corow"><span class="lb">Werte (y)</span><input id="coVal" placeholder="z. B. B1:B8"><button class="cbtn" id="coValPick">Markieren</button></div>
+    <div class="corow"><span class="lb">Achsentitel</span><input id="coXt" placeholder="x-Achse"><input id="coYt" placeholder="y-Achse"></div>
+    <div class="corow"><span class="lb">y-Achse von</span><input id="coYmin" inputmode="decimal" placeholder="auto"><span>bis</span><input id="coYmax" inputmode="decimal" placeholder="auto"><button class="cbtn" id="coAuto">Auto</button></div>
+  </div>
+  <div id="chartWrap"><canvas id="chartCv"></canvas></div>
+  <div id="chartInfo"></div>
+</div>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const COLS=26; let ROWS=60;   // Zeilenzahl einstellbar (60 … 1000), wird im Projekt gespeichert
+const colName=i=>String.fromCharCode(65+i);
+const colIdx=s=>{let n=0;for(const ch of s.toUpperCase())n=n*26+(ch.charCodeAt(0)-64);return n-1;};
+let data={};              // {A1:"=...", ...} Rohwerte
+let active='A1';
+let copyBuf=null;
+let selAnchor='A1', selFocus='A1', dragging=false;   // Bereichs-Markierung
+let editEl=null;            // Feld, das gerade bearbeitet wird (unabhängig vom Browser-Fokus – iPad verliert ihn beim Tippen auf Tastatur/Zellen)
+let kpBusy=false, refBusy=false;
+const isEditing=el=>!!el && (el===editEl || document.activeElement===el);
+function keepFocus(el){ if(!el)return;
+  [0,60,180].forEach(t=>setTimeout(()=>{ if(editEl===el && document.activeElement!==el){ try{ el.focus({preventScroll:true}); }catch(_){} } },t)); }
+let chartType='bar';
+
+/* ---------- Formel-Engine ---------- */
+function tokenize(str){ const t=[]; let i=0;
+  while(i<str.length){ const c=str[i];
+    if(c===' '){i++;continue;}
+    if('+-*/^(),:;'.includes(c)){ t.push({k:c}); i++; continue; }
+    if(c==='"'){ let j=i+1, v=''; while(j<str.length&&str[j]!=='"'){ v+=str[j]; j++; } t.push({k:'str',v}); i=j+1; continue; }   // Kriterium wie ">3" oder "ja"
+    if(c==='<'||c==='>'||c==='='){ let op=c; const nx=str[i+1];                                   // Vergleiche: = <> < <= > >=
+      if(c==='<'&&(nx==='='||nx==='>')){ op+=nx; i++; } else if(c==='>'&&nx==='='){ op+=nx; i++; }
+      i++; t.push({k:'cmp',v:op}); continue; }
+    if(/[0-9.]/.test(c)){ let j=i, dec=false;                                                     // Dezimaltrennzeichen: Punkt oder Komma (2,5), Komma sonst = Argumenttrenner
+      while(j<str.length){ const ch=str[j];
+        if(/[0-9]/.test(ch)){ j++; continue; }
+        if((ch==='.'||ch===',') && !dec && /[0-9]/.test(str[j+1]||'')){ dec=true; j++; continue; }
+        break; }
+      t.push({k:'num',v:parseFloat(str.slice(i,j).replace(',','.'))}); i=j; continue; }
+    if(/[A-Za-zÄÖÜäöüß$]/.test(c)){ let j=i; while(j<str.length&&/[A-Za-zÄÖÜäöüß0-9$]/.test(str[j]))j++; const s=str.slice(i,j); i=j;
+      if(/^\$?[A-Za-z]{1,2}\$?[0-9]+$/.test(s)) t.push({k:'ref',v:s.replace(/\$/g,'').toUpperCase()});
+      else t.push({k:'fn',v:s.toLowerCase()}); continue; }
+    throw new Error('token'); }
+  return t; }
+function evalFormula(src, resolve){ const t=tokenize(src); let p=0;
+  const peek=()=>t[p], next=()=>t[p++];
+  function expr(){ let v=addsub(); while(peek()&&peek().k==='cmp'){ const op=next().v; const r=addsub(); v=compare(v,op,r); } return v; }
+  function compare(a,op,b){ if(typeof a==='boolean')a=a?1:0; if(typeof b==='boolean')b=b?1:0;
+    let x=a,y=b; if(typeof a!=='number'||typeof b!=='number'){ x=String(a).toLowerCase(); y=String(b).toLowerCase(); }
+    switch(op){ case '=': return x===y; case '<>': return x!==y; case '>': return x>y; case '<': return x<y; case '>=': return x>=y; case '<=': return x<=y; }
+    return false; }
+  function addsub(){ let v=term(); while(peek()&&(peek().k==='+'||peek().k==='-')){ const op=next().k; const r=term(); v=op==='+'?v+r:v-r; } return v; }
+  function term(){ let v=power(); while(peek()&&(peek().k==='*'||peek().k==='/')){ const op=next().k; const r=power(); v=op==='*'?v*r:v/r; } return v; }
+  function power(){ let v=unary(); if(peek()&&peek().k==='^'){ next(); v=Math.pow(v,power()); } return v; }
+  function unary(){ if(peek()&&(peek().k==='+'||peek().k==='-')){ const op=next().k; return op==='-'?-unary():unary(); } return primary(); }
+  /* Werte eines Bereichs – leere Zellen und Texte werden übersprungen (sonst verfälschen sie Mittelwert, Anzahl, Minimum …) */
+  function rangeVals(a,b){ const out=[];
+    for(const id of rangeCells(a,b)){ const raw=(data[id]===undefined?'':String(data[id])).trim(); if(raw==='')continue;
+      const v=(raw[0]==='=') ? resolve(id) : Number(raw.replace(',','.'));
+      if(typeof v==='number'&&isFinite(v)) out.push(v); }
+    return out; }
+  function rangeCells(a,b){ const ac=colIdx(a.match(/[A-Z]+/)[0]),ar=+a.match(/[0-9]+/)[0],bc=colIdx(b.match(/[A-Z]+/)[0]),br=+b.match(/[0-9]+/)[0];
+    const c0=Math.min(ac,bc),c1=Math.max(ac,bc),r0=Math.min(ar,br),r1=Math.max(ar,br),out=[];
+    for(let c=c0;c<=c1;c++)for(let r=r0;r<=r1;r++) out.push(colName(c)+r); return out; }
+  /* ZÄHLENWENN(Bereich;Kriterium) – Kriterium: Zahl, Text ("ja") oder Vergleich (">3", "<=2", "<>0") */
+  function countIf(cells, crit){ let op='=', cmp=crit;
+    if(typeof crit==='string'){ const m=crit.trim().match(/^(>=|<=|<>|=|>|<)?\s*([\s\S]*)$/); op=m[1]||'='; cmp=m[2]; }
+    const cmpNum=Number(String(cmp).replace(',','.')), critIsNum=String(cmp).trim()!==''&&!isNaN(cmpNum);
+    let n=0;
+    for(const cell of cells){ const raw=(data[cell]||'').trim(); if(raw==='')continue;
+      const isFormula=raw[0]==='=', cellNum=isFormula?resolve(cell):Number(raw.replace(',','.'));
+      const cellIsNum=typeof cellNum==='number'&&isFinite(cellNum);
+      let ok=false;
+      if(critIsNum&&cellIsNum){ const d=cellNum-cmpNum;
+        ok = op==='=' ? d===0 : op==='<>' ? d!==0 : op==='>' ? d>0 : op==='<' ? d<0 : op==='>=' ? d>=0 : d<=0; }
+      else { const a=(isFormula?String(cellNum):raw).trim().toLowerCase(), b=String(cmp).trim().toLowerCase();
+        ok = op==='=' ? a===b : op==='<>' ? a!==b : false; }          // Text nur auf (Un-)Gleichheit prüfen
+      if(ok)n++; }
+    return n; }
+  const nameRef=w=>(typeof nameLookup==='function')?nameLookup(w):null;
+  function argList(){ const out=[];
+    do{ if(peek()&&peek().k==='ref'&&t[p+1]&&t[p+1].k===':'){ const a=next().v; next(); const b=next().v; out.push(...rangeVals(a,b)); }
+        else if(peek()&&peek().k==='fn'&&nameRef(peek().v)&&(!t[p+1]||t[p+1].k===','||t[p+1].k===';'||t[p+1].k===')')){
+          const r=nameRef(next().v); out.push(...rangeVals(r.a,r.b)); }        // benannter Bereich als ganzes Argument
+        else out.push(expr());
+    } while(peek()&&(peek().k===','||peek().k===';')&&(next(),true));
+    return out; }
+  const truthy=v=> v===true || (typeof v==='number'&&v!==0) || (typeof v==='string'&&v.trim()!=='');
+  const sorted=arr=>arr.slice().sort((x,y)=>x-y);
+  function quantile(arr,p){ const d=sorted(arr); if(!d.length)return NaN; if(d.length===1)return d[0];
+    const i=(d.length-1)*Math.max(0,Math.min(1,p)), lo=Math.floor(i), f=i-lo;
+    return f? d[lo]+f*(d[lo+1]-d[lo]) : d[lo]; }
+  function ggt2(x,y){ x=Math.abs(Math.round(x)); y=Math.abs(Math.round(y)); while(y){ const t=x%y; x=y; y=t; } return x; }
+  function roundTo(v,n,mode){ const p=Math.pow(10,Math.round(n||0)), sg=v<0?-1:1, x=Math.abs(v)*p;
+    const r = mode==='up' ? Math.ceil(x-1e-9) : mode==='down' ? Math.floor(x+1e-9) : Math.round(x+1e-9);
+    return sg*r/p; }
+  function callFn(n,a){ const f0=a.length?a[0]:0;
+    const nums=a.filter(v=>typeof v==='number'&&isFinite(v));            // Texte/Wahrheitswerte bleiben außen vor
+    const mean=arr=>arr.length?arr.reduce((s,v)=>s+v,0)/arr.length:0;
+    const sqSum=arr=>{ const m=mean(arr); return arr.reduce((s,v)=>s+(v-m)*(v-m),0); };
+    switch(n){
+      case 'sum': case 'summe': return nums.reduce((s,v)=>s+v,0);
+      case 'average': case 'mittelwert': case 'mean': case 'mw': return nums.length?mean(nums):0;
+      case 'min': return nums.length?Math.min(...nums):0; case 'max': return nums.length?Math.max(...nums):0;
+      case 'count': case 'anzahl': return nums.length;
+      case 'product': case 'produkt': return nums.reduce((s,v)=>s*v,1);
+      /* --- Statistik --- */
+      case 'median': return nums.length?quantile(nums,0.5):0;
+      case 'modalwert': case 'modus': case 'mode': { const c={}; let best=null,bn=0;
+        nums.forEach(v=>{ c[v]=(c[v]||0)+1; if(c[v]>bn||(c[v]===bn&&best!==null&&v<best)){ bn=c[v]; best=v; } });
+        return bn>1?best:(nums.length?best:0); }
+      case 'spannweite': return nums.length?Math.max(...nums)-Math.min(...nums):0;
+      case 'varianz': case 'var': return nums.length>1?sqSum(nums)/(nums.length-1):0;
+      case 'varianzen': case 'varp': return nums.length?sqSum(nums)/nums.length:0;
+      case 'stabw': case 'sd': return nums.length>1?Math.sqrt(sqSum(nums)/(nums.length-1)):0;
+      case 'stabwn': case 'sdp': return nums.length?Math.sqrt(sqSum(nums)/nums.length):0;
+      case 'quartil': { const k=nums.length?nums[nums.length-1]:1; return quantile(nums.slice(0,-1), Math.max(0,Math.min(4,k))/4); }
+      case 'quantil': case 'perzentil': { const k=nums.length?nums[nums.length-1]:0.5; return quantile(nums.slice(0,-1), k>1?k/100:k); }
+      /* --- Bedingungen --- */
+      case 'wenn': case 'if': return truthy(a[0]) ? (a.length>1?a[1]:true) : (a.length>2?a[2]:false);
+      case 'und': case 'and': return a.length? a.every(truthy) : false;
+      case 'oder': case 'or': return a.some(truthy);
+      case 'nicht': case 'not': return !truthy(a[0]);
+      case 'wahr': return true; case 'falsch': return false;
+      /* --- Runden & ganze Zahlen --- */
+      case 'aufrunden': return roundTo(f0, a[1], 'up');
+      case 'abrunden': return roundTo(f0, a[1], 'down');
+      case 'ganzzahl': case 'int': return Math.floor(f0);
+      case 'rest': case 'mod': { const b=a[1]; return b? f0-b*Math.floor(f0/b) : NaN; }
+      case 'ggt': case 'gcd': return nums.length?nums.reduce((x,y)=>ggt2(x,y)):0;
+      case 'kgv': case 'lcm': return nums.length?nums.reduce((x,y)=>{ const g=ggt2(x,y); return g? Math.abs(Math.round(x)*Math.round(y))/g : 0; }):0;
+      /* --- Winkel & Logarithmus --- */
+      case 'grad': case 'degrees': return f0*180/Math.PI;
+      case 'bogenmass': case 'radians': return f0*Math.PI/180;
+      case 'rand': case 'zufall': case 'zufallszahl': return a.length>=2 ? Math.floor(Math.random()*(a[1]-a[0]+1))+a[0] : Math.random();
+      case 'randbetween': case 'zufallsbereich': { const lo=a[0],hi=a[1]; return Math.floor(Math.random()*(hi-lo+1))+lo; }
+      case 'sqrt': case 'wurzel': return Math.sqrt(f0);
+      case 'sin': return Math.sin(f0); case 'cos': return Math.cos(f0); case 'tan': return Math.tan(f0);
+      case 'ln': return Math.log(f0); case 'log': return a.length>1?Math.log(f0)/Math.log(a[1]):Math.log10(f0); case 'exp': return Math.exp(f0);
+      case 'abs': return Math.abs(f0); case 'round': case 'runden': return roundTo(f0, a.length>1?a[1]:0, 'half');
+      case 'potenz': case 'power': return Math.pow(a[0],a[1]);
+      default: throw new Error('fn '+n); } }
+  function primary(){ const tk=peek(); if(!tk) throw new Error('eof');
+    if(tk.k==='num'){ next(); return tk.v; }
+    if(tk.k==='ref'){ next(); return resolve(tk.v); }
+    if(tk.k==='('){ next(); const v=expr(); if(peek()&&peek().k===')')next(); return v; }
+    if(tk.k==='str'){ next(); return tk.v; }
+    if(tk.k==='fn'){ next(); const name=tk.v;
+      const consts={pi:Math.PI,e:Math.E}; if(name in consts && (!peek()||peek().k!=='(')) return consts[name];
+      if(!peek()||peek().k!=='('){ const r=nameRef(name); if(r) return resolve(r.a); }        // benannte Zelle als Wert
+      if(name==='zählenwenn'||name==='zaehlenwenn'||name==='countif'){        // braucht die Zellen selbst, nicht nur ihre Zahlenwerte
+        let cells=[], crit=null;
+        if(peek()&&peek().k==='('){ next();
+          if(peek()&&peek().k==='ref'){ const a=next().v; let b=a; if(peek()&&peek().k===':'){ next(); b=next().v; } cells=rangeCells(a,b); }
+          if(peek()&&(peek().k===','||peek().k===';')){ next(); crit=expr(); }
+          if(peek()&&peek().k===')')next(); }
+        return countIf(cells,crit); }
+      let a=[]; if(peek()&&peek().k==='('){ next(); if(peek()&&peek().k!==')') a=argList(); if(peek()&&peek().k===')')next(); }
+      return callFn(name,a); }
+    throw new Error('primary'); }
+  const r=expr(); return r; }
+function evalCell(cell, seen, memo){ cell=cell.toUpperCase();
+  if(memo.has(cell)) return memo.get(cell);
+  if(seen.has(cell)) return NaN;
+  let raw=(data[cell]||'').trim(); if(raw==='') { memo.set(cell,0); return 0; }
+  if(raw[0]!=='='){ const n=Number(raw.replace(',','.')); const val=isNaN(n)?0:n; memo.set(cell,val); return val; }
+  const s2=new Set(seen); s2.add(cell);
+  let val; try{ val=evalFormula(raw.slice(1), ref=>evalCell(ref,s2,memo)); }catch(e){ val=NaN; }
+  memo.set(cell,val); return val; }
+const de=v=>String(v).replace('.',',');            // Anzeige mit deutschem Dezimalkomma
+function fmt(v){ if(typeof v==='string') return v;
+  if(typeof v==='boolean') return v?'WAHR':'FALSCH';
+  if(typeof v!=='number'||!isFinite(v)) return '#FEHLER';
+  const r=Math.round(v*1e10)/1e10;
+  return Math.abs(r)>=1e15 ? de(r.toExponential(6)) : de(r); }
+function display(cell,memo){ const raw=data[cell]||''; if(raw[0]==='=') return fmt(evalCell(cell,new Set(),memo)); return raw; }
+
+/* ---------- Gitter ---------- */
+const grid=document.getElementById('grid');
+/* Bei größerer Tabellen-Schrift werden die Spalten mitbreiter (gespeichert wird die Breite bei Grundschrift 14 px) */
+const fsK=()=>Math.max(1,(+data.fontSize||14)/14);
+function colWidth(c){ const w=(data.colW||{})[colName(c)]; return Math.round(((typeof w==='number'&&w>=40)?w:82)*fsK()); }
+function applyColWidths(){ const hw=Math.round(44*fsK()); let sum=hw;
+  const c0=grid.querySelector('col:not([data-c])'); if(c0) c0.style.width=hw+'px';
+  grid.querySelectorAll('col[data-c]').forEach(col=>{ const w=colWidth(+col.dataset.c); col.style.width=w+'px'; sum+=w; });
+  grid.style.width=sum+'px';   // feste Tabellenbreite, sonst quetscht table-layout:fixed die Spalten zusammen
+  placeFillHandle(); }
+function build(){ let html='<colgroup><col style="width:44px">';
+  for(let c=0;c<COLS;c++) html+='<col data-c="'+c+'">';
+  html+='</colgroup><thead><tr><th></th>';
+  for(let c=0;c<COLS;c++)html+='<th data-c="'+c+'" style="position:relative">'+colName(c)+'<span class="colres" data-c="'+c+'" title="Spaltenbreite ziehen · Doppeltipp = Standard"></span></th>';
+  html+='</tr></thead><tbody>';
+  for(let r=1;r<=ROWS;r++){ html+='<tr><th data-r="'+r+'">'+r+'</th>'; for(let c=0;c<COLS;c++){ const id=colName(c)+r; html+='<td data-cell="'+id+'"><input data-cell="'+id+'"></td>'; } html+='</tr>'; }
+  html+='</tbody>'; grid.innerHTML=html; applyColWidths();
+  if(typeof keysOn!=='undefined'&&keysOn) setTimeout(applyInputMode,0);
+  grid.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('focus',()=>{ if(editEl===inp){ formulaUI(inp); return; }        // schon in Bearbeitung: Text nicht überschreiben
+      // iOS setzt den Fokus auf die getippte Zelle, obwohl der Tipp zur Formel gehört → Bearbeitung zurückholen
+      if(editEl && (refPick || refBusy || String(editEl.value||'').trim()[0]==='=')){ const keep=editEl; keepFocus(keep); return; }
+      editEl=inp; setActive(inp.dataset.cell); inp.value=data[inp.dataset.cell]||''; formulaUI(inp); });
+    inp.addEventListener('blur',()=>{ if(editEl===inp){ keepFocus(inp); return; }   // Eingabe läuft weiter – beendet wird nur bewusst (Enter/✓/Fertig/Esc oder Tipp woanders)
+      clearRefHi(); ovHide(); commit(inp); });
+    inp.addEventListener('input',()=>{ document.getElementById('fx').value=inp.value; formulaUI(inp); });
+    inp.addEventListener('keydown',e=>{ handleKey(e,inp); });
+    inp.addEventListener('scroll',()=>{ if(ovTarget===inp) ovPlace(); });
+    inp.addEventListener('click',()=>{ if(ovTarget===inp) ovPlace(); });
+    inp.addEventListener('pointerdown',()=>{ selAnchor=selFocus=inp.dataset.cell; dragging=true; renderRange(); });
+    inp.addEventListener('pointerenter',()=>{ if(dragging && inp.dataset.cell!==selFocus){ selFocus=inp.dataset.cell;
+      if(document.activeElement&&document.activeElement.blur)document.activeElement.blur(); renderRange(); } });
+  });
+  recompute();
+}
+document.addEventListener('pointerup',()=>{ dragging=false; hdrDrag=null; });
+
+/* ---------- Bereich mit dem Finger in eine Formel übernehmen ("=summe(" + Zellen streichen) ---------- */
+let refPick=null;
+/* Solange eine Formel offen ist, gehört jeder Zell-Tipp zur Formel – nie zur Zellauswahl.
+   Steht direkt vor dem Cursor schon ein Bezug (oder ein Name), wird dieser ersetzt, sonst eingefügt. */
+function refTarget(){ const el=editEl||document.activeElement;
+  if(!el||el.tagName!=='INPUT'||(el.id!=='fx'&&!el.dataset.cell))return null;
+  const v=el.value||''; if(v[0]!=='=')return null;                                        // nur bei Formeln
+  const pos=(el.selectionStart==null?v.length:el.selectionStart);
+  const before=v.slice(0,pos);
+  if(/[=+\-*/^(:;,<>]\s*$/.test(before)) return {el,pos,len:0};                            // nach Operator/Klammer: einfügen
+  const m=before.match(/(\$?[A-Za-z]{1,2}\$?[0-9]+(?:\s*:\s*\$?[A-Za-z]{1,2}\$?[0-9]+)?)$/);
+  if(m){ const st=pos-m[1].length, pre=v[st-1];
+    if(!pre||!/[A-Za-z0-9_$]/.test(pre)) return {el,pos:st,len:m[1].length}; }             // vorhandenen Bezug ersetzen
+  const nms=Object.keys(nameMap());
+  for(const nm of nms.sort((a,b)=>b.length-a.length)){
+    if(before.toLowerCase().endsWith(nm.toLowerCase())){ const st=pos-nm.length, pre=v[st-1];
+      if(!pre||!/[A-Za-z0-9_$]/.test(pre)) return {el,pos:st,len:nm.length}; } }           // Namen ebenso ersetzen
+  return {el,pos,len:0}; }                                                                 // sonst an der Cursorposition einfügen
+function refInsert(a,b){ if(!refPick)return; const {el}=refPick; const txt=(a===b)?a:(a+':'+b);
+  el.value=el.value.slice(0,refPick.start)+txt+el.value.slice(refPick.start+refPick.len);
+  refPick.len=txt.length; const c=refPick.start+refPick.len;
+  try{ el.setSelectionRange(c,c); }catch(_){}
+  if(el.id!=='fx') $('fx').value=el.value; else if(inputOf(active)) inputOf(active).value=el.value;
+  formulaUI(el); refMark(a,b); }
+function refMark(a,b){ const A=cellCR(a), B=cellCR(b), c0=Math.min(A.c,B.c),c1=Math.max(A.c,B.c),r0=Math.min(A.r,B.r),r1=Math.max(A.r,B.r);
+  const set=new Set(); for(let c=c0;c<=c1;c++)for(let r=r0;r<=r1;r++)set.add(colName(c)+r);
+  grid.querySelectorAll('td[data-cell]').forEach(td=>td.classList.toggle('refsel',set.has(td.dataset.cell))); }
+function refClear(){ grid.querySelectorAll('td.refsel').forEach(td=>td.classList.remove('refsel')); }
+grid.addEventListener('pointerdown',e=>{
+  if(e.target.closest('.colres')||e.target.closest('.fillh'))return;
+  const t=refTarget();
+  if(!t){ const td0=e.target.closest('td[data-cell]');                        // keine offene Formel: laufende Eingabe sicher abschließen
+    if(editEl && editEl.dataset && (!td0 || editEl.dataset.cell!==td0.dataset.cell)){ const prev=editEl; editEl=null; hideFormulaUI(); commit(prev); }
+    return; }
+  const td=e.target.closest('td[data-cell]'), th=e.target.closest('th[data-c],th[data-r]');
+  if(!td&&!th)return;
+  if(td && editEl && editEl.dataset && editEl.dataset.cell===td.dataset.cell) return;   // Tipp in die eigene Zelle: Cursor setzen, kein Selbstbezug
+  e.preventDefault(); e.stopPropagation();                                    // Fokus bleibt in der Formel
+  refBusy=true; keepFocus(t.el);
+  refPick={el:t.el,start:t.pos,len:t.len||0,anchor:null};
+  if(th&&th.dataset.c!==undefined){ const cn=colName(+th.dataset.c); refPick.anchor=cn+'1'; refInsert(cn+'1',cn+ROWS); refPick.whole='col'; }
+  else if(th){ const r=+th.dataset.r; refPick.anchor='A'+r; refInsert('A'+r,colName(COLS-1)+r); refPick.whole='row'; }
+  else { refPick.anchor=td.dataset.cell; refInsert(refPick.anchor,refPick.anchor); }
+}, true);
+document.addEventListener('pointermove',e=>{ if(!refPick||refPick.whole)return;
+  const el=document.elementFromPoint(e.clientX,e.clientY); const td=el&&el.closest?el.closest('td[data-cell]'):null; if(!td)return;
+  refInsert(refPick.anchor, td.dataset.cell); },{passive:false});
+document.addEventListener('pointerup',()=>{ if(!refPick)return; const el=refPick.el; refPick=null; refClear();   // grüne Zieh-Markierung weg; der farbige Rahmen der Bezüge bleibt
+  keepFocus(el); setTimeout(()=>{ refBusy=false; },600); });
+
+/* ---------- Alle in der Formel verwendeten Zellen/Bereiche farbig markieren ---------- */
+const REFCOLORS=['#2563eb','#16a34a','#d97706','#db2777','#7c3aed','#0891b2'];
+let hiCells=[];
+function clearRefHi(){ hiCells.forEach(td=>{ td.classList.remove('refhi'); td.style.removeProperty('--rc'); }); hiCells=[]; refClear(); }
+function hideFormulaUI(){ clearRefHi(); ovHide(); }
+/* Formel in Abschnitte zerlegen: jeder Bezug bekommt eine Farbe (gleiche Farbe wie die Zelle im Blatt) */
+function refParts(text){ const parts=[], marks=[];
+  if(!text||String(text).trim()[0]!=='=') return {parts:[{text:text||''}], marks};
+  const nms=Object.keys(nameMap()).sort((x,y)=>y.length-x.length);
+  const re=new RegExp('(\\$?[A-Za-z]{1,2}\\$?[0-9]+)(?:\\s*:\\s*(\\$?[A-Za-z]{1,2}\\$?[0-9]+))?'
+    + (nms.length?('|('+nms.join('|')+')'):''), 'g');
+  const seen={}; let m, n=0, last=0;
+  while((m=re.exec(text))!==null){
+    const prev=text[m.index-1]; if(prev&&/[A-Za-z0-9$]/.test(prev))continue;            // z. B. „log10" ist kein Bezug
+    let a,b;
+    if(m[3]){ const nx=text[m.index+m[0].length]; if(nx&&/[A-Za-z0-9_]/.test(nx))continue;
+      const r=nameLookup(m[3]); if(!r)continue; a=r.a; b=r.b; }
+    else { a=m[1].replace(/\$/g,'').toUpperCase(); b=(m[2]||m[1]).replace(/\$/g,'').toUpperCase(); }
+    if(!/^[A-Z]{1,2}[0-9]+$/.test(a)||!/^[A-Z]{1,2}[0-9]+$/.test(b))continue;
+    const key=a+':'+b; let col=seen[key]; if(col===undefined){ col=REFCOLORS[(n++)%REFCOLORS.length]; seen[key]=col; marks.push({a,b,col}); }
+    if(m.index>last) parts.push({text:text.slice(last,m.index)});
+    parts.push({text:m[0], color:col}); last=m.index+m[0].length; }
+  if(last<text.length) parts.push({text:text.slice(last)});
+  return {parts,marks}; }
+function highlightRefs(text){ clearRefHi();
+  const {marks}=refParts(text); let count=0;
+  for(const {a,b,col} of marks){ const A=cellCR(a), B=cellCR(b);
+    for(let c=Math.min(A.c,B.c);c<=Math.max(A.c,B.c);c++)
+      for(let r=Math.min(A.r,B.r);r<=Math.max(A.r,B.r);r++){
+        if(++count>1500)return;                                                          // Sicherheitsbremse
+        const td=grid.querySelector('td[data-cell="'+colName(c)+r+'"]');
+        if(td){ td.classList.add('refhi'); td.style.setProperty('--rc',col); hiCells.push(td); } } } }
+
+/* ---------- Farbige Bezüge direkt in der Formel (Textebene über dem Eingabefeld) ---------- */
+const ovEl=document.createElement('div'); ovEl.id='fmlOv'; document.body.appendChild(ovEl);
+let ovTarget=null;
+function ovHide(){ if(ovTarget){ ovTarget.style.color=''; ovTarget.style.caretColor=''; ovTarget=null; } ovEl.classList.remove('show'); ovEl.innerHTML=''; }
+function ovPlace(){ if(!ovTarget)return;
+  const el=ovTarget, r=el.getBoundingClientRect();
+  if(el.dataset.cell){ const wr=$('wrap').getBoundingClientRect(), head=grid.tHead?grid.tHead.getBoundingClientRect().height:0;
+    if(r.top < wr.top+head-1 || r.bottom > wr.bottom+1 || r.right < wr.left || r.left > wr.right){ ovEl.classList.remove('show'); return; } }
+  const cs=getComputedStyle(el);
+  ovEl.style.left=r.left+'px'; ovEl.style.top=r.top+'px'; ovEl.style.width=r.width+'px'; ovEl.style.height=r.height+'px';
+  ovEl.style.font=cs.font; ovEl.style.letterSpacing=cs.letterSpacing; ovEl.style.padding=cs.padding;
+  ovEl.style.justifyContent = cs.textAlign==='right'?'flex-end':(cs.textAlign==='center'?'center':'flex-start');
+  const inner=ovEl.firstChild; if(inner) inner.style.transform='translateX('+(-el.scrollLeft)+'px)';
+  ovEl.classList.add('show'); }
+function ovUpdate(el){ const editing = el && (isEditing(el) || (refPick&&refPick.el===el));
+  if(!editing || String(el.value||'').trim()[0]!=='='){ if(!el||ovTarget===el) ovHide(); return; }
+  if(ovTarget&&ovTarget!==el){ ovTarget.style.color=''; ovTarget.style.caretColor=''; }
+  ovTarget=el; el.style.color='transparent'; el.style.caretColor='#1f2430';
+  const {parts}=refParts(el.value);
+  const inner=document.createElement('span'); inner.className='ovInner';
+  parts.forEach(p=>{ const sp=document.createElement('span'); sp.textContent=p.text; if(p.color)sp.style.color=p.color; inner.appendChild(sp); });
+  ovEl.innerHTML=''; ovEl.appendChild(inner); ovPlace(); }
+function formulaUI(el){ highlightRefs(el?el.value:''); ovUpdate(el); }
+$('wrap').addEventListener('scroll',ovPlace,{passive:true});
+addEventListener('resize',ovPlace); addEventListener('scroll',ovPlace,{passive:true});
+/* Eingabe beenden, wenn man außerhalb tippt (Werkzeugleiste, Diagramm …) */
+function endEdit(){ if(!editEl)return; const prev=editEl; editEl=null; hideFormulaUI();
+  if(prev.id==='fx') fxCommit(); else commit(prev); }
+document.addEventListener('pointerdown',e=>{ if(!editEl)return;
+  if(e.target===editEl || e.target.closest('#keypad') || e.target.closest('#grid') || e.target.closest('#fx') || e.target.closest('#fxGo') || e.target.closest('#fileMenu')) return;
+  endEdit(); });
+
+/* ---------- Kopfzeile/Kopfspalte antippen = ganze Spalte/Zeile markieren ---------- */
+let hdrDrag=null;
+function markHeaders(){ const {c0,c1,r0,r1}=selRect(); const fullCol=(r0===1&&r1===ROWS), fullRow=(c0===0&&c1===COLS-1);
+  grid.querySelectorAll('thead th[data-c]').forEach(th=>th.classList.toggle('hsel', fullCol && +th.dataset.c>=c0 && +th.dataset.c<=c1));
+  grid.querySelectorAll('tbody th[data-r]').forEach(th=>th.classList.toggle('hsel', fullRow && +th.dataset.r>=r0 && +th.dataset.r<=r1)); }
+function selectCols(c0,c1){ selAnchor=colName(c0)+'1'; selFocus=colName(c1)+ROWS; setActive(colName(c0)+'1'); selAnchor=colName(c0)+'1'; selFocus=colName(c1)+ROWS; renderRange(); }
+function selectRows(r0,r1){ selAnchor='A'+r0; selFocus=colName(COLS-1)+r1; setActive('A'+r0); selAnchor='A'+r0; selFocus=colName(COLS-1)+r1; renderRange(); }
+grid.addEventListener('pointerdown',e=>{ if(e.target.closest('.colres'))return; if(refTarget())return;
+  const th=e.target.closest('th[data-c],th[data-r]'); if(!th)return;
+  e.preventDefault(); if(editEl){ const prev=editEl; editEl=null; hideFormulaUI(); commit(prev); }
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+  if(th.dataset.c!==undefined){ hdrDrag={type:'col',from:+th.dataset.c}; selectCols(+th.dataset.c,+th.dataset.c); }
+  else { hdrDrag={type:'row',from:+th.dataset.r}; selectRows(+th.dataset.r,+th.dataset.r); } });
+document.addEventListener('pointermove',e=>{ if(!hdrDrag)return;
+  const el=document.elementFromPoint(e.clientX,e.clientY); const th=el&&el.closest?el.closest('th[data-c],th[data-r]'):null; if(!th)return;
+  if(hdrDrag.type==='col'&&th.dataset.c!==undefined){ const c=+th.dataset.c; selectCols(Math.min(hdrDrag.from,c),Math.max(hdrDrag.from,c)); }
+  else if(hdrDrag.type==='row'&&th.dataset.r!==undefined){ const r=+th.dataset.r; selectRows(Math.min(hdrDrag.from,r),Math.max(hdrDrag.from,r)); } });
+
+/* ---------- Spaltenbreite ziehen ---------- */
+let resz=null;
+grid.addEventListener('pointerdown',e=>{ const h=e.target.closest('.colres'); if(!h)return;
+  e.preventDefault(); e.stopPropagation(); const c=+h.dataset.c; resz={c,x:e.clientX,w:colWidth(c)};
+  try{ h.setPointerCapture(e.pointerId); }catch(_){} }, true);
+document.addEventListener('pointermove',e=>{ if(!resz)return; e.preventDefault();
+  data.colW=data.colW||{}; data.colW[colName(resz.c)]=Math.round(Math.max(46,Math.min(420,(resz.w+(e.clientX-resz.x))/fsK())));
+  applyColWidths(); },{passive:false});
+document.addEventListener('pointerup',()=>{ if(resz){ resz=null; sync(); } });
+grid.addEventListener('dblclick',e=>{ const h=e.target.closest('.colres'); if(!h)return;
+  if(data.colW){ delete data.colW[colName(+h.dataset.c)]; applyColWidths(); sync(); } });
+/* Finger-Auswahl: pointerenter feuert bei Touch nicht (impliziter Pointer-Capture) → per elementFromPoint verfolgen */
+document.addEventListener('pointermove',e=>{ if(!dragging||filling)return;
+  const el=document.elementFromPoint(e.clientX,e.clientY); const td=el&&el.closest?el.closest('td[data-cell]'):null; if(!td)return;
+  const cell=td.dataset.cell; if(cell!==selFocus){ selFocus=cell; if(document.activeElement&&document.activeElement.blur)document.activeElement.blur(); renderRange(); } });
+/* ---------- Bereichs-Markierung ---------- */
+function cellCR(id){ return {c:colIdx(id.match(/[A-Z]+/)[0]), r:parseInt(id.match(/[0-9]+/)[0])}; }
+function selRect(){ const a=cellCR(selAnchor||active), b=cellCR(selFocus||active);
+  return {c0:Math.min(a.c,b.c),c1:Math.max(a.c,b.c),r0:Math.min(a.r,b.r),r1:Math.max(a.r,b.r)}; }
+function selCells(){ const {c0,c1,r0,r1}=selRect(); const cells=[]; for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++)cells.push(colName(c)+r); return cells; }
+function renderRange(){ const cells=selCells(); const multi=cells.length>1; const set=new Set(cells);
+  grid.querySelectorAll('td[data-cell]').forEach(td=>td.classList.toggle('rng', multi && set.has(td.dataset.cell))); markHeaders(); placeFillHandle(); }
+/* ---------- Ausfüllkästchen: Formeln/Werte durch Ziehen kopieren (Zellbezüge angepasst) ---------- */
+const fillEl=document.createElement('div'); fillEl.className='fillh'; fillEl.title='Zum Ausfüllen ziehen';
+let filling=false, fillSeed=null, fillPrev=null;
+function placeFillHandle(){ if(filling)return; const {c1,r1}=selRect(); const td=grid.querySelector('td[data-cell="'+colName(c1)+r1+'"]'); if(td)td.appendChild(fillEl); }
+function showFillPreview(rect){ const set=new Set(); for(let c=rect.c0;c<=rect.c1;c++)for(let r=rect.r0;r<=rect.r1;r++)set.add(colName(c)+r);
+  grid.querySelectorAll('td[data-cell]').forEach(td=>td.classList.toggle('fpre', set.has(td.dataset.cell))); }
+function clearFillPreview(){ grid.querySelectorAll('td.fpre').forEach(td=>td.classList.remove('fpre')); }
+/* Zahl aus einer Zelle (keine Formel, keine leere Zelle) */
+function fillNum(raw){ if(raw===undefined||raw===null)return null; const t=String(raw).trim();
+  if(t===''||t[0]==='=')return null; const n=Number(t.replace(',','.')); return isNaN(n)?null:n; }
+/* Reihe fortsetzen: 1;2 → 3;4;5 …  auch „Gruppe 1" → „Gruppe 2" */
+function seriesGen(rawList, dir){
+  if(rawList.some(r=>String(r||'').trim()[0]==='=')) return null;        // Formeln immer kopieren (mit angepassten Bezügen)
+  const comma=rawList.some(r=>String(r||'').includes(','));
+  const fmtS=v=>{ let s=String(Math.round(v*1e10)/1e10); return comma?s.replace('.',','):s; };
+  const nums=rawList.map(fillNum);
+  if(nums.every(v=>v!==null)){
+    if(nums.length<2) return null;                                     // Einzelwert wird kopiert (wie in Excel)
+    const step=nums[1]-nums[0];
+    for(let i=2;i<nums.length;i++) if(Math.abs((nums[i]-nums[i-1])-step)>1e-9) return null;
+    if(step===0) return null;
+    const base=dir>0?nums[nums.length-1]:nums[0];
+    return i=>fmtS(base+dir*i*step); }
+  const parts=rawList.map(r=>{ const m=String(r==null?'':r).match(/^(.*?)(\d+)$/); return m?{p:m[1],n:+m[2],w:m[2].length,zero:/^0\d/.test(m[2])}:null; });
+  if(parts.every(x=>x) && parts.every(x=>x.p===parts[0].p)){
+    let step=1;
+    if(parts.length>1){ step=parts[1].n-parts[0].n;
+      for(let i=2;i<parts.length;i++) if(parts[i].n-parts[i-1].n!==step) return null;
+      if(step===0) return null; }
+    const base=dir>0?parts[parts.length-1]:parts[0];
+    return i=>{ const v=Math.max(0,base.n+dir*i*step); return base.p+(base.zero?String(v).padStart(base.w,'0'):String(v)); }; }
+  return null; }
+function applyFill(rect, seed){ snapshot();
+  const vertical = rect.r0<seed.r0 || rect.r1>seed.r1;
+  const dir = vertical ? (rect.r1>seed.r1?1:-1) : (rect.c1>seed.c1?1:-1);
+  const lines = vertical ? [] : [];
+  const outer = vertical ? {from:rect.c0,to:rect.c1} : {from:rect.r0,to:rect.r1};
+  for(let k=outer.from;k<=outer.to;k++){
+    const src=[];                                                       // Quellzellen dieser Zeile/Spalte
+    if(vertical){ for(let r=seed.r0;r<=seed.r1;r++) src.push(colName(k)+r); }
+    else { for(let c=seed.c0;c<=seed.c1;c++) src.push(colName(c)+k); }
+    const gen=seriesGen(src.map(id=>data[id]||''), dir);
+    const targets=[];
+    if(vertical){ if(dir>0){ for(let r=seed.r1+1;r<=rect.r1;r++) targets.push(colName(k)+r); }
+                  else { for(let r=seed.r0-1;r>=rect.r0;r--) targets.push(colName(k)+r); } }
+    else { if(dir>0){ for(let c=seed.c1+1;c<=rect.c1;c++) targets.push(colName(c)+k); }
+           else { for(let c=seed.c0-1;c>=rect.c0;c--) targets.push(colName(c)+k); } }
+    const L=src.length;
+    targets.forEach((tgt,i)=>{
+      if(gen){ const v=gen(i+1); if(v==='') delete data[tgt]; else data[tgt]=v; return; }
+      const si = dir>0 ? (i%L) : (L-1-(i%L));                            // sonst Block kopieren (Formeln mit angepassten Bezügen)
+      let raw=data[src[si]]||'';
+      if(raw[0]==='=') raw='='+adjustRefs(raw.slice(1), src[si], tgt);
+      if(raw==='') delete data[tgt]; else data[tgt]=raw; });
+  }
+  recompute(); sync(); }
+fillEl.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); filling=true; fillPrev=null; fillSeed=selRect();
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+  try{ fillEl.setPointerCapture(e.pointerId); }catch(_){} });
+document.addEventListener('pointermove',e=>{ if(!filling)return; e.preventDefault();
+  const el=document.elementFromPoint(e.clientX,e.clientY); const td=el&&el.closest?el.closest('td[data-cell]'):null; if(!td)return;
+  const t=cellCR(td.dataset.cell), s=fillSeed;
+  const dCol=Math.max(0,t.c-s.c1)+Math.max(0,s.c0-t.c), dRow=Math.max(0,t.r-s.r1)+Math.max(0,s.r0-t.r);
+  const rect = dRow>=dCol ? {c0:s.c0,c1:s.c1,r0:Math.min(s.r0,t.r),r1:Math.max(s.r1,t.r)}
+                          : {c0:Math.min(s.c0,t.c),c1:Math.max(s.c1,t.c),r0:s.r0,r1:s.r1};
+  fillPrev=rect; showFillPreview(rect); }, {passive:false});
+document.addEventListener('pointerup',()=>{ if(!filling)return; filling=false;
+  if(fillPrev){ applyFill(fillPrev, fillSeed); selAnchor=colName(fillPrev.c0)+fillPrev.r0; selFocus=colName(fillPrev.c1)+fillPrev.r1; }
+  clearFillPreview(); fillPrev=null; renderRange(); });
+function setActive(cell){
+  if(editEl && editEl.dataset && editEl.dataset.cell && editEl.dataset.cell!==cell && String(editEl.value||'').trim()[0]==='=') return;   // offene Formel: Auswahl bleibt stehen
+  active=cell;
+  const ref=(typeof selRefString==='function')?selRefString():cell, nm=(typeof nameOf==='function')?(nameOf(ref)||nameOf(cell)):null;
+  const cr=document.getElementById('cellref'); cr.textContent=nm?('🏷 '+nm):cell; cr.title=nm?(nm+' = '+ref+' – tippen zum Ändern'):'Namen für die Zelle/den Bereich vergeben';
+  document.getElementById('fx').value=data[cell]||'';
+  grid.querySelectorAll('td.sel').forEach(td=>td.classList.remove('sel')); const td=grid.querySelector('td[data-cell="'+cell+'"]'); if(td)td.classList.add('sel');
+  if(!dragging){ selAnchor=selFocus=cell; renderRange(); } }
+function inputOf(cell){ return grid.querySelector('input[data-cell="'+cell+'"]'); }
+function commit(inp){ if(!refPick) hideFormulaUI(); const cell=inp.dataset.cell; const val=inp.value;
+  if((data[cell]||'')!==val) snapshot();
+  if(val==='') delete data[cell]; else data[cell]=val; recompute(); sync(); }
+function recompute(){ const memo=new Map(); grid.querySelectorAll('input').forEach(inp=>{ const cell=inp.dataset.cell; if(document.activeElement===inp||editEl===inp)return;
+    if(data[cell]===undefined && inp.value==='') return;                    // leere Zelle: nichts zu tun (hält große Blätter flott)
+    const d=display(cell,memo); inp.value=d;
+    inp.parentElement.classList.toggle('num', d!=='' && !isNaN(Number(String(d).replace(',','.')))); }); }
+/* Zeilenzahl ändern (Daten bleiben erhalten) */
+function setRows(n,save){ n=Math.max(20,Math.min(1000,+n||60)); if(n===ROWS){ if(save)sync(); return; }
+  ROWS=n; data.rows=n; const keep=active; build(); applyFont(); const inp=inputOf(keep); if(inp) setActive(keep);
+  $('rowSel').value=String(ROWS); if(save)sync(); }
+function ensureRows(minRow){ if(minRow>ROWS){ const opts=[60,100,200,500,1000]; setRows(opts.find(o=>o>=minRow)||1000,true); } }
+function moveTo(cell){ const inp=inputOf(cell); if(inp){ inp.focus(); inp.select&&inp.select(); } }
+function handleKey(e,inp){ const cell=inp.dataset.cell; const c=colIdx(cell.match(/[A-Z]+/)[0]); const r=parseInt(cell.match(/[0-9]+/)[0]);
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='c'){ copyBuf={cell,raw:data[cell]||''}; return; }
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='v'){ if(copyBuf){ e.preventDefault(); paste(cell); } return; }
+  if(e.key==='Escape'){ e.preventDefault(); inp.value=data[cell]||''; hideFormulaUI(); editEl=null; commit(inp); inp.blur(); return; }   // Eingabe verwerfen
+  if(e.key==='Enter'){ e.preventDefault(); editEl=null; hideFormulaUI(); commit(inp); inp.blur(); if(r<ROWS) moveTo(colName(c)+(r+1)); }
+  else if(e.key==='Tab'){ /* Browser-Standard: nächste Zelle */ inp.blur(); }
+}
+function adjustRefs(formula, from, to){ const fc=colIdx(from.match(/[A-Z]+/)[0]), fr=parseInt(from.match(/[0-9]+/)[0]);
+  const tc=colIdx(to.match(/[A-Z]+/)[0]), tr=parseInt(to.match(/[0-9]+/)[0]); const dC=tc-fc, dR=tr-fr;
+  return formula.replace(/(\$?)([A-Za-z]{1,2})(\$?)([0-9]+)/g,(m,a1,col,a2,row)=>{
+    let nc=colIdx(col), nr=parseInt(row); if(a1!=='$') nc+=dC; if(a2!=='$') nr+=dR; nc=Math.max(0,nc); nr=Math.max(1,nr);
+    return a1+colName(nc)+a2+nr; }); }
+function paste(target){ let raw=copyBuf.raw; if(raw[0]==='=') raw='='+adjustRefs(raw.slice(1), copyBuf.cell, target); if(raw==='') delete data[target]; else data[target]=raw; recompute(); sync(); setActive(target); }
+
+/* ---------- Namen für Zellen und Bereiche ---------- */
+const RESERVED=new Set(['summe','sum','mittelwert','average','mean','mw','min','max','anzahl','count','produkt','product',
+ 'median','modalwert','modus','mode','spannweite','varianz','var','varianzen','varp','stabw','sd','stabwn','sdp','quartil','quantil','perzentil',
+ 'wenn','if','und','and','oder','or','nicht','not','wahr','falsch','zählenwenn','zaehlenwenn','countif',
+ 'wurzel','sqrt','potenz','power','abs','runden','round','aufrunden','abrunden','ganzzahl','int','rest','mod','ggt','gcd','kgv','lcm',
+ 'sin','cos','tan','ln','log','exp','grad','degrees','bogenmass','radians','pi','e','zufall','rand','zufallszahl','zufallsbereich','randbetween']);
+const nameMap=()=>data.names||{};
+function nameOf(cellOrRange){ const m=nameMap(); for(const k in m) if(m[k]===cellOrRange) return k; return null; }
+function nameLookup(word){ const m=nameMap(), w=String(word||'').toLowerCase();
+  for(const k in m) if(k.toLowerCase()===w){ const v=m[k], p=v.split(':'); return {a:p[0],b:p[1]||p[0]}; } return null; }
+function selRefString(){ const {c0,c1,r0,r1}=selRect(); const a=colName(c0)+r0, b=colName(c1)+r1; return a===b?a:(a+':'+b); }
+function editName(){ const ref=selRefString(), cur=nameOf(ref)||'';
+  const inp=prompt('Name für '+ref+' (leer lassen = Name entfernen):', cur);
+  if(inp===null)return;
+  const nm=inp.trim();
+  snapshot(); data.names=Object.assign({},nameMap());
+  if(cur) delete data.names[cur];
+  if(nm){
+    if(!/^[A-Za-zÄÖÜäöüß_][A-Za-zÄÖÜäöüß0-9_]{0,23}$/.test(nm)){ toast('Name: Buchstabe zuerst, dann Buchstaben/Ziffern/_'); return; }
+    if(/^[A-Za-z]{1,2}[0-9]+$/.test(nm)){ toast('„'+nm+'" sieht aus wie ein Zellbezug – bitte anderen Namen wählen'); return; }
+    if(RESERVED.has(nm.toLowerCase())){ toast('„'+nm+'" ist ein Funktionsname'); return; }
+    for(const k in data.names) if(k.toLowerCase()===nm.toLowerCase()) delete data.names[k];
+    data.names[nm]=ref; toast('„'+nm+'" = '+ref); }
+  else toast('Name entfernt');
+  if(!Object.keys(data.names).length) delete data.names;
+  setActive(active); recompute(); sync(); }
+$('cellref').onclick=editName;
+$('cellref').title='Namen für die Zelle/den Bereich vergeben';
+
+/* ---------- Rückgängig / Wiederherstellen ---------- */
+let undoStack=[], redoStack=[], lastSnap='';
+function snapshot(){ const j=JSON.stringify(data); if(j===lastSnap)return; lastSnap=j;
+  undoStack.push(j); if(undoStack.length>60)undoStack.shift(); redoStack=[]; updateUndoUI(); }
+function updateUndoUI(){ const u=$('btnUndo'), r=$('btnRedo'); if(u)u.disabled=!undoStack.length; if(r)r.disabled=!redoStack.length; }
+function restoreState(j){ data=JSON.parse(j); lastSnap=j;
+  const want=Math.max(20,Math.min(1000,+data.rows||ROWS)); if(want!==ROWS){ ROWS=want; build(); $('rowSel').value=String(ROWS); }
+  applyFont(); applyColWidths(); recompute(); sync(); updateUndoUI(); }
+function undo(){ if(!undoStack.length)return; redoStack.push(JSON.stringify(data)); restoreState(undoStack.pop()); toast('Rückgängig'); }
+function redo(){ if(!redoStack.length)return; undoStack.push(JSON.stringify(data)); restoreState(redoStack.pop()); toast('Wiederhergestellt'); }
+$('btnUndo').onclick=undo; $('btnRedo').onclick=redo;
+addEventListener('keydown',e=>{ if(!(e.metaKey||e.ctrlKey))return; const k=e.key.toLowerCase();
+  if(k==='z'&&!e.shiftKey){ e.preventDefault(); undo(); } else if(k==='y'||(k==='z'&&e.shiftKey)){ e.preventDefault(); redo(); } });
+
+/* ---------- Schriftgröße (auch ohne Tafel bedienbar) ---------- */
+function fsStep(d){ const cur=+data.fontSize||14; data.fontSize=Math.max(10,Math.min(40,cur+d)); applyFont(); applyColWidths(); sync(); }
+$('btnFsM').onclick=()=>fsStep(-2); $('btnFsP').onclick=()=>fsStep(2);
+
+/* ---------- Sync mit Tafel + Autospeichern (eigenständig genutzt) ---------- */
+const standalone = (()=>{ try{ return window.parent===window; }catch(e){ return true; } })();
+const AUTOKEY='tafel_sheet_auto';
+let autoTimer=null;
+function autoSave(){ if(!standalone)return; clearTimeout(autoTimer);
+  autoTimer=setTimeout(()=>{ try{ localStorage.setItem(AUTOKEY, JSON.stringify(data)); }catch(e){} },400); }
+function sync(){ if(!standalone){ try{ parent.postMessage({type:'embed-data',data},'*'); }catch(e){} }   // eigenständig: kein Echo an sich selbst
+  autoSave(); }
+
+/* ---------- Datei-Menü ---------- */
+const fileMenu=$('fileMenu');
+$('btnFile').onclick=e=>{ e.stopPropagation(); fileMenu.classList.toggle('show'); };
+document.addEventListener('pointerdown',e=>{ if(fileMenu.classList.contains('show')&&!e.target.closest('#fileWrap')) fileMenu.classList.remove('show'); });
+function closeFileMenu(){ fileMenu.classList.remove('show'); }
+function usedRange(){ let mc=-1, mr=0;
+  for(const k in data){ const m=/^([A-Z]+)([0-9]+)$/.exec(k); if(!m)continue;
+    mc=Math.max(mc,colIdx(m[1])); mr=Math.max(mr,+m[2]); }
+  return {c:mc,r:mr}; }
+function saveBlob(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000); }
+function stamp(){ return new Date().toISOString().slice(0,16).replace(/[:T]/g,'-'); }
+$('btnSave').onclick=()=>{ closeFileMenu();
+  saveBlob(new Blob([JSON.stringify({tafelTabelle:1,data},null,1)],{type:'application/json'}), 'tabelle-'+stamp()+'.json');
+  toast('Tabelle gespeichert'); };
+$('btnCsv').onclick=()=>{ closeFileMenu(); const u=usedRange();
+  if(u.c<0){ toast('Nichts zu speichern'); return; }
+  const memo=new Map(), lines=[];
+  for(let r=1;r<=u.r;r++){ const row=[];
+    for(let c=0;c<=u.c;c++){ let v=display(colName(c)+r,memo); if(/[";\n]/.test(v)) v='"'+v.replace(/"/g,'""')+'"'; row.push(v); }
+    lines.push(row.join(';')); }
+  saveBlob(new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}), 'tabelle-'+stamp()+'.csv');
+  toast('CSV gespeichert'); };
+$('btnNew').onclick=()=>{ closeFileMenu();
+  if(!confirm('Neue, leere Tabelle?\nInhalte, Namen, Spaltenbreiten, Schriftgröße und Zeilenzahl werden zurückgesetzt.'))return;
+  snapshot(); editEl=null; hideFormulaUI(); data={}; ROWS=60;
+  build(); $('rowSel').value='60'; applyFont(); applyColWidths(); recompute(); setActive('A1'); sync(); toast('Neue Tabelle'); };
+$('btnClear').onclick=()=>{ closeFileMenu(); if(!confirm('Wirklich alle Zellen löschen?'))return; snapshot();
+  const keep={rows:data.rows,colW:data.colW,fontSize:data.fontSize,fontBold:data.fontBold,fontItalic:data.fontItalic};
+  data={}; for(const k in keep) if(keep[k]!==undefined) data[k]=keep[k];
+  recompute(); sync(); toast('Alles gelöscht'); };
+$('btnOpen').onclick=()=>{ closeFileMenu(); $('fileImp').click(); };
+function applyFont(){ const r=document.documentElement.style; r.setProperty('--fs',(+data.fontSize||14)+'px'); r.setProperty('--fw',data.fontBold?'700':'400'); r.setProperty('--fwh',data.fontBold?'900':'700'); r.setProperty('--fwm',data.fontBold?'800':'600'); r.setProperty('--fi',data.fontItalic?'italic':'normal'); }
+addEventListener('message',e=>{ if(e.data&&e.data.type==='embed-data'){ data=e.data.data||{};
+  const want=Math.max(20,Math.min(1000,+data.rows||60));
+  if(want!==ROWS){ ROWS=want; build(); }
+  $('rowSel').value=String(ROWS); applyFont(); applyColWidths(); recompute(); } });
+function fxCommit(){ hideFormulaUI(); editEl=null; kpBusy=false; const cell=active, val=document.getElementById('fx').value; if((data[cell]||'')!==val) snapshot();      // Wert direkt übernehmen (ohne fragilen Fokus/Blur-Umweg)
+  if(val==='') delete data[cell]; else data[cell]=val;
+  const inp=inputOf(cell);                                              // Formeleingabe wirklich beenden …
+  if(inp){ inp.value=data[cell]||''; if(document.activeElement===inp) inp.blur(); }   // … sonst gilt der nächste Zell-Tipp weiter als Bezug
+  recompute(); sync();
+  const c=colIdx(cell.match(/[A-Z]+/)[0]), r=parseInt(cell.match(/[0-9]+/)[0]);
+  if(r<ROWS) setActive(colName(c)+(r+1)); }
+document.getElementById('fx').addEventListener('input',function(){ formulaUI(this); const i=inputOf(active); if(i&&document.activeElement!==i)i.value=this.value; });
+$('fx').addEventListener('focus',function(){ editEl=this; formulaUI(this); });
+$('fx').addEventListener('scroll',function(){ if(ovTarget===this) ovPlace(); });
+$('fx').addEventListener('click',function(){ if(ovTarget===this) ovPlace(); });
+document.getElementById('fx').addEventListener('blur',()=>{ if(!refPick) ovHide(); if(!refPick) setTimeout(()=>{ if(!refPick&&document.activeElement!==$('fx')&&!(document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.cell)) clearRefHi(); },50); });
+document.getElementById('fx').addEventListener('keydown',e=>{ if(e.key!=='Enter')return; e.preventDefault(); fxCommit(); });
+document.getElementById('fxGo').onclick=fxCommit;
+
+/* ---------- Diagramme (Säulen / Boxplot) ---------- */
+function round(v){ return Math.round(v*1e6)/1e6; }
+const roundDe=v=>de(round(v));
+function numOf(v){ if(v==='')return null; const n=Number(String(v).replace(',','.')); return isNaN(n)||!isFinite(n)?null:n; }
+function niceTicks(lo,hi,n){ const span=(hi-lo)||1; const raw=span/Math.max(1,n); const mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const norm=raw/mag; const step=(norm<1.5?1:norm<3?2:norm<7?5:10)*mag; const start=Math.ceil(lo/step-1e-9)*step; const t=[];
+  for(let v=start; v<=hi+1e-9; v+=step) t.push(round(v)); return t; }
+function quantile(s,q){ const pos=(s.length-1)*q, base=Math.floor(pos), rest=pos-base;
+  return s[base+1]!==undefined ? s[base]+rest*(s[base+1]-s[base]) : s[base]; }
+/* Werte des markierten Bereichs; bei 2 Spalten/Zeilen: erste = Beschriftung, zweite = Wert */
+function chartOpt(){ data.chartOpt=data.chartOpt||{}; return data.chartOpt; }
+/* Zellen eines Bezugs wie "B2:B9" (spaltenweise); null, wenn der Text kein gültiger Bezug ist */
+function refList(ref){ const m=String(ref||'').trim().toUpperCase().match(/^([A-Z]+[0-9]+)(?::([A-Z]+[0-9]+))?$/); if(!m)return null;
+  const a=cellCR(m[1]), b=cellCR(m[2]||m[1]);
+  const c0=Math.min(a.c,b.c),c1=Math.max(a.c,b.c),r0=Math.min(a.r,b.r),r1=Math.max(a.r,b.r), out=[];
+  if(c1>=COLS||r1>ROWS||r0<1)return null;
+  for(let c=c0;c<=c1;c++)for(let r=r0;r<=r1;r++) out.push(colName(c)+r);
+  return out; }
+function chartData(){ const memo=new Map();
+  const o=chartOpt(), vl=(chartType==='bar')?refList(o.val):null, cl=(chartType==='bar')?refList(o.cat):null;
+  if(vl){ const labels=[], values=[];                       // eigene Achsen-Bereiche (Säulendiagramm)
+    vl.forEach((id,i)=>{ const v=numOf(display(id,memo)); if(v===null)return;
+      const l=(cl&&cl[i]!==undefined)?String(display(cl[i],memo)):'';
+      values.push(v); labels.push(l!==''?l:String(values.length)); });
+    return {labels,values}; }
+  const {c0,c1,r0,r1}=selRect(); const w=c1-c0+1, h=r1-r0+1;
+  const disp=(c,r)=>display(colName(c)+r,memo);
+  let labels=[], values=[];
+  if(w===2){ for(let r=r0;r<=r1;r++){ const v=numOf(disp(c1,r)); if(v!==null){ const l=disp(c0,r); labels.push(l!==''?String(l):('#'+(r-r0+1))); values.push(v); } } }
+  else if(h===2 && w>=2){ for(let c=c0;c<=c1;c++){ const v=numOf(disp(c,r1)); if(v!==null){ const l=disp(c,r0); labels.push(l!==''?String(l):('#'+(c-c0+1))); values.push(v); } } }
+  else { let i=0; for(let c=c0;c<=c1;c++)for(let r=r0;r<=r1;r++){ const v=numOf(disp(c,r)); if(v!==null){ i++; values.push(v); labels.push(String(i)); } } }
+  return {labels,values}; }
+/* Schriftgröße der Diagrammbeschriftung (Standard 12 px); K = Faktor für Schrift und Ränder */
+const chartFs=()=>Math.max(8,Math.min(32,+data.chartFs||12));
+const CK=()=>chartFs()/12;
+const cfont=(px,bold)=>(bold?'bold ':'')+Math.round(px*CK())+'px -apple-system,sans-serif';
+function ctxFor(){ const cv=$('chartCv'); const w=cv.clientWidth||300, h=cv.clientHeight||200; const dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); const c=cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,w,h);
+  c.font=cfont(11); return {c,w,h}; }
+function noData(c,w,h,msg){ c.fillStyle='#8a93a2'; c.font=cfont(14); c.textAlign='center'; c.fillText(msg,w/2,h/2); }
+function drawBar(){ const {labels,values}=chartData(); const {c,w,h}=ctxFor(), o=chartOpt();
+  if(!values.length){ noData(c,w,h,'Keine Zahlen im markierten Bereich.'); $('chartInfo').textContent=''; return; }
+  const xt=(o.xt||'').trim(), yt=(o.yt||'').trim();
+  const k=CK(), padL=(yt?66:48)*k, padR=16, padT=18*k, padB=(46+(xt?18:0))*k, plotW=w-padL-padR, plotH=h-padT-padB;
+  const um=numOf(o.ymin), ux=numOf(o.ymax);                    // Start-/Endwert der senkrechten Achse (leer = automatisch)
+  let maxV=Math.max(...values,0), minV=Math.min(...values,0);
+  if(um!==null)minV=um; if(ux!==null)maxV=ux; if(maxV<=minV)maxV=minV+1;
+  const range=maxV-minV, clamp=v=>Math.max(minV,Math.min(maxV,v));
+  const yOf=v=>padT+(maxV-clamp(v))/range*plotH, y0=yOf(0);
+  c.strokeStyle='#e2e7ef'; c.fillStyle='#8a93a2'; c.textAlign='right'; c.lineWidth=1;
+  niceTicks(minV,maxV,5).forEach(t=>{ const y=yOf(t); c.beginPath(); c.moveTo(padL,y); c.lineTo(padL+plotW,y); c.stroke(); c.fillText(de(String(t)),padL-6,y+4*k); });
+  c.strokeStyle='#9aa4b2'; c.beginPath(); c.moveTo(padL,padT); c.lineTo(padL,padT+plotH); c.stroke();
+  const n=values.length, slot=plotW/n, bw=Math.min(slot*0.68,64*k);
+  c.textAlign='center';
+  values.forEach((v,i)=>{ const cx=padL+slot*i+slot/2, top=yOf(v), bh=Math.abs(top-y0);
+    c.fillStyle='#3b82f6'; c.fillRect(cx-bw/2, Math.min(top,y0), bw, Math.max(bh,1));
+    c.fillStyle='#1f2430'; c.fillText(roundDe(v), cx, Math.max(padT+10*k,Math.min(top,y0)-4));
+    c.fillStyle='#5b6472'; const lab=labels[i]||String(i+1); c.fillText(lab.length>10?lab.slice(0,9)+'…':lab, cx, padT+plotH+15*k, slot); });
+  c.strokeStyle='#334155'; c.beginPath(); c.moveTo(padL,y0); c.lineTo(padL+plotW,y0); c.stroke();
+  c.fillStyle='#1f2430'; c.font=cfont(12,true);
+  if(xt){ c.textAlign='center'; c.fillText(xt, padL+plotW/2, padT+plotH+34*k); }
+  if(yt){ c.save(); c.translate(14*k,padT+plotH/2); c.rotate(-Math.PI/2); c.textAlign='center'; c.fillText(yt,0,0); c.restore(); }
+  const sum=values.reduce((a,b)=>a+b,0);
+  $('chartInfo').textContent='n = '+n+' · Summe = '+roundDe(sum)+' · Mittelwert = '+roundDe(sum/n); }
+function drawBox(){ const vals=chartData().values.slice().sort((a,b)=>a-b); const {c,w,h}=ctxFor();
+  if(!vals.length){ noData(c,w,h,'Keine Zahlen im markierten Bereich.'); $('chartInfo').textContent=''; return; }
+  const min=vals[0], max=vals[vals.length-1], q1=quantile(vals,.25), med=quantile(vals,.5), q3=quantile(vals,.75);
+  const k=CK(), padT=18*k,padB=24*k,padL=54*k,padR=90*k, plotH=h-padT-padB;
+  const lo=min, hi=max, range=(hi-lo)||1, yOf=v=>padT+(hi-v)/range*plotH;
+  c.strokeStyle='#e2e7ef'; c.fillStyle='#8a93a2'; c.textAlign='right'; c.lineWidth=1;
+  niceTicks(lo,hi,5).forEach(t=>{ const y=yOf(t); c.beginPath(); c.moveTo(padL,y); c.lineTo(w-padR,y); c.stroke(); c.fillText(de(String(t)),padL-6,y+4*k); });
+  const boxL=padL+(w-padL-padR)*0.28, boxR=padL+(w-padL-padR)*0.72, cx=(boxL+boxR)/2, cap=(boxR-boxL)*0.5;
+  c.strokeStyle='#334155'; c.lineWidth=1.5;
+  c.beginPath(); c.moveTo(cx,yOf(max)); c.lineTo(cx,yOf(q3)); c.moveTo(cx,yOf(q1)); c.lineTo(cx,yOf(min)); c.stroke();
+  c.beginPath(); c.moveTo(cx-cap/2,yOf(max)); c.lineTo(cx+cap/2,yOf(max)); c.moveTo(cx-cap/2,yOf(min)); c.lineTo(cx+cap/2,yOf(min)); c.stroke();
+  c.fillStyle='rgba(59,130,246,.18)'; c.fillRect(boxL,yOf(q3),boxR-boxL,yOf(q1)-yOf(q3));
+  c.strokeStyle='#3b82f6'; c.lineWidth=2; c.strokeRect(boxL,yOf(q3),boxR-boxL,yOf(q1)-yOf(q3));
+  c.strokeStyle='#ef4444'; c.beginPath(); c.moveTo(boxL,yOf(med)); c.lineTo(boxR,yOf(med)); c.stroke();
+  c.fillStyle='#1f2430'; c.textAlign='left';
+  c.font=cfont(12); [['Max',max],['Q₃',q3],['Median',med],['Q₁',q1],['Min',min]].forEach(([t,v])=>c.fillText(t+' = '+roundDe(v), boxR+10, yOf(v)+4*k));
+  $('chartInfo').textContent='n = '+vals.length+' · Min '+roundDe(min)+' · Q₁ '+roundDe(q1)+' · Median '+roundDe(med)+' · Q₃ '+roundDe(q3)+' · Max '+roundDe(max)+' · IQR '+roundDe(q3-q1); }
+const PIE=['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16','#06b6d4','#e11d48'];
+function drawPie(){ const {labels,values}=chartData(); const {c,w,h}=ctxFor();
+  const pos=values.map((v,i)=>({v,l:labels[i]||('#'+(i+1))})).filter(o=>o.v>0);
+  const total=pos.reduce((a,o)=>a+o.v,0);
+  if(!pos.length||total<=0){ noData(c,w,h,'Keine positiven Zahlen im markierten Bereich.'); $('chartInfo').textContent=''; return; }
+  const k=CK(), legendW=Math.min(210*k,Math.max(120*k,w*0.34*k),w*0.55), area=w-legendW;
+  const cxp=area/2, cyp=h/2, R=Math.max(24,Math.min(area/2,h/2)-18);
+  let a0=-Math.PI/2;
+  pos.forEach((o,i)=>{ const a1=a0+o.v/total*2*Math.PI, col=PIE[i%PIE.length];
+    c.beginPath(); c.moveTo(cxp,cyp); c.arc(cxp,cyp,R,a0,a1); c.closePath(); c.fillStyle=col; c.fill(); c.strokeStyle='#fff'; c.lineWidth=2; c.stroke();
+    const mid=(a0+a1)/2, pct=o.v/total*100;
+    if(pct>=6){ c.fillStyle='#fff'; c.font=cfont(12,true); c.textAlign='center';
+      c.fillText(Math.round(pct)+'%', cxp+Math.cos(mid)*R*0.62, cyp+Math.sin(mid)*R*0.62+4*k); }
+    a0=a1; });
+  const lx=area+8; let ly=Math.max(20*k, cyp-pos.length*10*k); c.textAlign='left'; c.font=cfont(12);
+  pos.forEach((o,i)=>{ c.fillStyle=PIE[i%PIE.length]; c.fillRect(lx,ly-9*k,12*k,12*k);
+    c.fillStyle='#1f2430'; const lab=String(o.l), pct=Math.round(o.v/total*100);
+    c.fillText((lab.length>12?lab.slice(0,11)+'…':lab)+'  '+roundDe(o.v)+' ('+de(pct)+'%)', lx+18*k, ly+1); ly+=20*k; });
+  $('chartInfo').textContent='n = '+pos.length+' · Summe = '+roundDe(total); }
+function drawChart(){ $('chartTitle').textContent=chartType==='bar'?'Säulendiagramm':chartType==='pie'?'Kreisdiagramm':'Boxplot';
+  $('chartBar').classList.toggle('on',chartType==='bar'); $('chartPie').classList.toggle('on',chartType==='pie'); $('chartBox').classList.toggle('on',chartType==='box');
+  const bar=chartType==='bar'; $('chartOptBtn').style.display=bar?'':'none';
+  if(!bar)$('chartOpt').classList.remove('show'); $('chartOptBtn').classList.toggle('on',$('chartOpt').classList.contains('show'));
+  if(bar)drawBar(); else if(chartType==='pie')drawPie(); else drawBox(); }
+/* --- Achsen-Einstellungen (nur Säulendiagramm) --- */
+function fillChartOpt(){ const o=chartOpt();
+  $('coCat').value=o.cat||''; $('coVal').value=o.val||''; $('coXt').value=o.xt||''; $('coYt').value=o.yt||'';
+  $('coYmin').value=o.ymin||''; $('coYmax').value=o.ymax||''; }
+function readChartOpt(){ const o=chartOpt();
+  o.cat=$('coCat').value.trim().toUpperCase(); o.val=$('coVal').value.trim().toUpperCase();
+  o.xt=$('coXt').value; o.yt=$('coYt').value; o.ymin=$('coYmin').value.trim(); o.ymax=$('coYmax').value.trim();
+  sync(); drawChart(); }
+['coCat','coVal','coXt','coYt','coYmin','coYmax'].forEach(id=>{ $(id).oninput=readChartOpt; });
+$('coAuto').onclick=()=>{ $('coYmin').value=''; $('coYmax').value=''; readChartOpt(); };
+$('chartOptBtn').onclick=()=>{ const p=$('chartOpt'); const show=!p.classList.contains('show');
+  p.classList.toggle('show',show); if(show)fillChartOpt(); $('chartOptBtn').classList.toggle('on',show); drawChart(); };
+/* Bereich mit dem Finger wählen: Diagramm kurz ausblenden, in der Tabelle markieren, „Übernehmen" */
+let chartPickFor=null;
+function chartPick(field,txt){ chartPickFor=field; $('chartOv').classList.remove('show');
+  $('chartPickTxt').textContent=txt; $('chartPickBar').classList.add('show'); }
+function chartPickEnd(take){ const bar=$('chartPickBar'); bar.classList.remove('show');
+  if(take&&chartPickFor){ $(chartPickFor).value=selRefString(); readChartOpt(); }
+  chartPickFor=null; $('chartOv').classList.add('show'); fillChartOpt(); drawChart(); }
+$('coCatPick').onclick=()=>chartPick('coCat','Bereich für die Rubriken (x-Achse) in der Tabelle markieren');
+$('coValPick').onclick=()=>chartPick('coVal','Bereich für die Werte (y-Achse) in der Tabelle markieren');
+$('chartPickOk').onclick=()=>chartPickEnd(true);
+$('chartPickCancel').onclick=()=>chartPickEnd(false);
+function openChart(){ if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+  $('chartOv').classList.add('show'); fillChartOpt(); drawChart(); }
+$('btnChart').onclick=openChart;
+$('chartBar').onclick=()=>{ chartType='bar'; drawChart(); };
+$('chartPie').onclick=()=>{ chartType='pie'; drawChart(); };
+$('chartBox').onclick=()=>{ chartType='box'; drawChart(); };
+$('chartClose').onclick=()=>$('chartOv').classList.remove('show');
+function chartFsStep(d){ data.chartFs=Math.max(8,Math.min(32,chartFs()+d)); sync(); drawChart(); }
+$('chartFsM').onclick=()=>chartFsStep(-2); $('chartFsP').onclick=()=>chartFsStep(2);
+window.addEventListener('resize',()=>{ if($('chartOv').classList.contains('show'))drawChart(); });
+
+/* ---------- Toast ---------- */
+let toastT=null; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1900); }
+
+/* ---------- Import (CSV/Excel) & Zwischenablage ---------- */
+function parseDelimited(text){
+  const nl=text.replace(/\r\n?/g,'\n'); const firstLine=nl.split('\n')[0]||'';
+  let delim=','; if(firstLine.indexOf('\t')>=0) delim='\t';
+  else if((firstLine.split(';').length-1)>(firstLine.split(',').length-1)) delim=';';
+  const rows=[]; let row=[], cur='', inQ=false;
+  for(let i=0;i<nl.length;i++){ const ch=nl[i];
+    if(inQ){ if(ch==='"'){ if(nl[i+1]==='"'){cur+='"';i++;} else inQ=false; } else cur+=ch; }
+    else if(ch==='"') inQ=true;
+    else if(ch===delim){ row.push(cur); cur=''; }
+    else if(ch==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+    else cur+=ch; }
+  row.push(cur); rows.push(row);
+  while(rows.length && rows[rows.length-1].length===1 && rows[rows.length-1][0]==='') rows.pop();
+  return rows; }
+function placeRows(rows, origin){ snapshot(); const o=cellCR(origin);
+  ensureRows(o.r+rows.length-1);
+  rows.forEach((r,ri)=>r.forEach((val,ci)=>{ const cc=o.c+ci, rr=o.r+ri; if(cc>=COLS||rr>ROWS)return;
+    const cell=colName(cc)+rr, v=String(val).trim(); if(v==='') delete data[cell]; else data[cell]=v; }));
+  recompute(); sync(); }
+/* --- Minimal-ZIP (für .xlsx) via nativer DecompressionStream --- */
+async function unzipXLSX(ab){ const dv=new DataView(ab), u8=new Uint8Array(ab), dec=new TextDecoder();
+  let eocd=-1; const min=Math.max(0, ab.byteLength-22-65536);
+  for(let i=ab.byteLength-22;i>=min;i--){ if(dv.getUint32(i,true)===0x06054b50){ eocd=i; break; } }
+  if(eocd<0) throw new Error('Keine gültige XLSX/ZIP-Datei.');
+  const count=dv.getUint16(eocd+10,true); let p=dv.getUint32(eocd+16,true); const ent={};
+  for(let n=0;n<count;n++){ if(dv.getUint32(p,true)!==0x02014b50) break;
+    const method=dv.getUint16(p+10,true), compSize=dv.getUint32(p+20,true);
+    const nameLen=dv.getUint16(p+28,true), extraLen=dv.getUint16(p+30,true), commentLen=dv.getUint16(p+32,true);
+    const lho=dv.getUint32(p+42,true); const name=dec.decode(u8.subarray(p+46,p+46+nameLen));
+    const lNameLen=dv.getUint16(lho+26,true), lExtraLen=dv.getUint16(lho+28,true); const ds=lho+30+lNameLen+lExtraLen;
+    ent[name]={method,comp:u8.subarray(ds,ds+compSize)}; p+=46+nameLen+extraLen+commentLen; }
+  async function get(name){ const e=ent[name]; if(!e)return null;
+    if(e.method===0) return e.comp;
+    const s=new Blob([e.comp]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(s).arrayBuffer()); }
+  return {get}; }
+async function importXLSX(ab){ const zip=await unzipXLSX(ab); const dec=new TextDecoder();
+  const xml=async n=>{ const b=await zip.get(n); return b? new DOMParser().parseFromString(dec.decode(b),'application/xml') : null; };
+  const shared=[]; const ss=await xml('xl/sharedStrings.xml');
+  if(ss) for(const si of ss.getElementsByTagName('si')){ let s=''; for(const t of si.getElementsByTagName('t')) s+=t.textContent; shared.push(s); }
+  let sheetPath='xl/worksheets/sheet1.xml'; const wb=await xml('xl/workbook.xml');
+  const wr=await xml('xl/_rels/workbook.xml.rels'); const RNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  if(wb&&wr){ const first=wb.getElementsByTagName('sheet')[0]; const rid=first&&(first.getAttributeNS(RNS,'id')||first.getAttribute('r:id'));
+    if(rid) for(const r of wr.getElementsByTagName('Relationship')) if(r.getAttribute('Id')===rid){ let tg=r.getAttribute('Target').replace(/^\//,''); sheetPath=tg.indexOf('xl/')===0?tg:'xl/'+tg; } }
+  const sheet=await xml(sheetPath); if(!sheet) return null;
+  const cw={}; for(const col of sheet.getElementsByTagName('col')){        // Spaltenbreiten aus Excel übernehmen
+    const w=parseFloat(col.getAttribute('width')||''); if(!isFinite(w))continue;
+    const a=parseInt(col.getAttribute('min')||'0'), b=parseInt(col.getAttribute('max')||'0');
+    for(let i=a;i<=b&&i<=COLS;i++) if(i>0) cw[colName(i-1)]=Math.round(Math.max(46,Math.min(420,w*7+8))); }
+  const map={_colW:cw}; for(const c of sheet.getElementsByTagName('c')){ const ref=c.getAttribute('r'); if(!ref)continue;
+    const t=c.getAttribute('t'); const vEl=c.getElementsByTagName('v')[0]; const isEl=c.getElementsByTagName('is')[0]; let val='';
+    if(t==='s'){ const i=+(vEl?vEl.textContent:'-1'); val=shared[i]!==undefined?shared[i]:''; }
+    else if(t==='inlineStr'&&isEl){ for(const tt of isEl.getElementsByTagName('t')) val+=tt.textContent; }
+    else if(vEl) val=vEl.textContent;
+    map[ref.toUpperCase()]=val; }
+  return map; }
+function placeAbsolute(map){ snapshot(); let any=false;
+  if(map._colW && Object.keys(map._colW).length){ data.colW=Object.assign({},data.colW||{},map._colW); applyColWidths(); }
+  let maxR=0; for(const a in map){ const m=a.match(/^[A-Z]+([0-9]+)$/); if(m) maxR=Math.max(maxR,+m[1]); } ensureRows(maxR);
+  for(const addr in map){ const m=addr.match(/^([A-Z]+)([0-9]+)$/); if(!m)continue;
+    const c=colIdx(m[1]), r=+m[2]; if(c>=COLS||r<1||r>ROWS)continue; const v=String(map[addr]).trim();
+    if(v==='') delete data[addr]; else { data[addr]=v; any=true; } }
+  recompute(); sync(); return any; }
+async function onImportFile(f){ if(!f)return; const nm=(f.name||'').toLowerCase();
+  try{
+    if(nm.endsWith('.json')||nm.endsWith('.tabelle')){ const o=JSON.parse(await f.text());
+      const d=(o&&o.data&&typeof o.data==='object')?o.data:o;
+      if(!d||typeof d!=='object'){ toast('Datei nicht lesbar'); return; }
+      snapshot(); restoreState(JSON.stringify(d)); toast('Tabelle geöffnet'); return; }
+    if(nm.endsWith('.xlsx')){ if(typeof DecompressionStream==='undefined'){ toast('Browser kann .xlsx nicht entpacken – bitte als CSV speichern.'); return; }
+      const map=await importXLSX(await f.arrayBuffer()); if(map&&placeAbsolute(map)) toast('Excel-Datei importiert'); else toast('Keine Daten gefunden.'); }
+    else if(nm.endsWith('.xls')){ toast('Altes .xls bitte als .xlsx oder CSV speichern.'); }
+    else { const rows=parseDelimited(await f.text()); placeRows(rows,'A1'); toast('CSV importiert ('+rows.length+' Zeilen)'); }
+  }catch(err){ toast('Import fehlgeschlagen: '+err.message); } }
+async function pasteClipboard(){ try{ const text=await navigator.clipboard.readText();
+    if(!text||!text.trim()){ toast('Zwischenablage leer'); return; }
+    const rows=parseDelimited(text); placeRows(rows, active); toast('Eingefügt ab '+active); }
+  catch(e){ toast('Zwischenablage nicht verfügbar – bitte in eine Zelle tippen und einfügen.'); } }
+$('rowSel').onchange=function(){ setRows(this.value,true); };
+$('fileImp').onclick=e=>{ e.target.value=''; };
+$('fileImp').onchange=e=>{ onImportFile(e.target.files[0]); };
+$('btnPaste').onclick=pasteClipboard;
+/* ---------- Formel-Tastatur (für Tablets ohne Tastatur) ---------- */
+let keysOn=false;
+const KP_FN=[['SUMME','summe('],['MITTELWERT','mittelwert('],['ANZAHL','anzahl('],['MIN','min('],['MAX','max('],
+  ['WENN','wenn('],['ZÄHLENWENN','zählenwenn('],['RUNDEN','runden('],['WURZEL','wurzel('],['MEDIAN','median('],
+  ['STABW','stabw('],['ZUFALL','zufallszahl(']];
+const KP_ROWS=[
+  [['7','7'],['8','8'],['9','9'],['(','(',1],[')',')',1],['⌫',null,0,'del']],
+  [['4','4'],['5','5'],['6','6'],['×','*',1],['÷','/',1],[';',';',1]],
+  [['1','1'],['2','2'],['3','3'],['+','+',1],['−','-',1],[':',':',1]],
+  [['0','0'],[',',','],['=','=',1],['$',null,0,'dollar'],['^','^',1],['◀',null,0,'left'],['▶',null,0,'right']],
+  [['ABC',null,0,'abc'],['>','>',1],['<','<',1],['≥','>=',1],['≤','<=',1],['≠','<>',1],['✓ Fertig',null,0,'enter','act']]
+];
+function buildKeypad(){ const kp=$('keypad'); if(kp.dataset.built)return; kp.dataset.built='1';
+  const chips=document.createElement('div'); chips.className='kp-row chips';
+  KP_FN.forEach(([lab,ins])=>{ const b=document.createElement('button'); b.className='fn'; b.textContent=lab; b.dataset.ins=ins; chips.appendChild(b); });
+  kp.appendChild(chips);
+  KP_ROWS.forEach(row=>{ const r=document.createElement('div'); r.className='kp-row';
+    row.forEach(([lab,ins,op,act,cls])=>{ const b=document.createElement('button'); b.textContent=lab;
+      if(op)b.classList.add('op'); if(cls)b.classList.add(cls); if(act==='del')b.classList.add('del');
+      if(ins!==null&&ins!==undefined)b.dataset.ins=ins; if(act)b.dataset.act=act; r.appendChild(b); });
+    kp.appendChild(r); });
+  kp.addEventListener('pointerdown',e=>{ const b=e.target.closest('button'); if(!b)return;
+    e.preventDefault();                                   // Fokus bleibt im Eingabefeld (sonst würde die Formel abgeschlossen)
+    kpBusy=true;                                          // falls iOS trotzdem den Fokus wegnimmt: Blur nicht als „fertig" werten
+    if(b.dataset.ins!==undefined) kpInsert(b.dataset.ins); else kpAction(b.dataset.act);
+    setTimeout(()=>{ kpBusy=false; },250); }); }
+function kpTarget(){ const a=editEl||document.activeElement;
+  if(a&&(a.id==='fx'||(a.dataset&&a.dataset.cell))) { keepFocus(a); return a; }
+  const inp=inputOf(active); if(inp){ editEl=inp; inp.value=data[active]||''; try{ inp.focus({preventScroll:true}); }catch(_){}
+    try{ const n=inp.value.length; inp.setSelectionRange(n,n); }catch(_){} formulaUI(inp); }
+  return inp; }
+function kpInsert(txt){ const el=kpTarget(); if(!el)return;
+  if(!el.value && txt!=='=' && !/^[0-9,]$/.test(txt)) txt='='+txt;      // Formel automatisch mit „=" beginnen
+  const s=el.selectionStart==null?el.value.length:el.selectionStart, e=el.selectionEnd==null?s:el.selectionEnd;
+  el.value=el.value.slice(0,s)+txt+el.value.slice(e);
+  const c=s+txt.length; try{ el.setSelectionRange(c,c); }catch(_){}
+  el.dispatchEvent(new Event('input',{bubbles:true})); }
+function kpAction(act){ const el=kpTarget(); if(!el)return;
+  const s=el.selectionStart==null?el.value.length:el.selectionStart, e=el.selectionEnd==null?s:el.selectionEnd;
+  if(act==='del'){ if(e>s){ el.value=el.value.slice(0,s)+el.value.slice(e); try{el.setSelectionRange(s,s);}catch(_){} }
+    else if(s>0){ el.value=el.value.slice(0,s-1)+el.value.slice(s); try{el.setSelectionRange(s-1,s-1);}catch(_){} }
+    el.dispatchEvent(new Event('input',{bubbles:true})); return; }
+  if(act==='dollar'){                                                  // $ setzen bzw. A1 → $A$1 → A$1 → $A1 → A1 durchschalten
+    const v=el.value, re=/\$?[A-Za-z]{1,2}\$?[0-9]+/g; let m, hit=null;
+    while((m=re.exec(v))!==null){ if(s>=m.index && s<=m.index+m[0].length) hit=m; }
+    if(!hit){ kpInsert('$'); return; }
+    const parts=hit[0].match(/^(\$?)([A-Za-z]{1,2})(\$?)([0-9]+)$/); if(!parts){ kpInsert('$'); return; }
+    const state=(parts[1]?1:0)+(parts[3]?2:0);                         // 0=A1 1=$A1 2=A$1 3=$A$1
+    const next=[3,0,1,2][state];                                        // A1 → $A$1 → A$1 → $A1 → A1 …
+    const rep=(next&1?'$':'')+parts[2]+(next&2?'$':'')+parts[4];
+    el.value=v.slice(0,hit.index)+rep+v.slice(hit.index+hit[0].length);
+    const c=hit.index+rep.length; try{ el.setSelectionRange(c,c); }catch(_){}
+    el.dispatchEvent(new Event('input',{bubbles:true})); return; }
+  if(act==='left'){ const c=Math.max(0,s-1); try{el.setSelectionRange(c,c);}catch(_){} ovPlace(); return; }
+  if(act==='right'){ const c=Math.min(el.value.length,e+1); try{el.setSelectionRange(c,c);}catch(_){} ovPlace(); return; }
+  if(act==='abc'){ kpBusy=false; setKeypad(false);                     // auf die normale Tastatur wechseln (Text, Umlaute, Diktat)
+    try{ el.blur(); el.focus(); const n=el.value.length; el.setSelectionRange(n,n); }catch(_){}
+    toast('Buchstaben-Tastatur – mit ⌨ zurück zu den Formeln'); return; }
+  if(act==='enter'){ if(el.id==='fx'){ fxCommit(); return; }
+    const cell=el.dataset.cell, r=parseInt(cell.match(/[0-9]+/)[0]), c=colIdx(cell.match(/[A-Z]+/)[0]);
+    editEl=null; kpBusy=false; commit(el); hideFormulaUI(); el.blur();
+    if(r<ROWS){ const nx=inputOf(colName(c)+(r+1)); if(nx){ editEl=keysOn?nx:null; nx.value=data[colName(c)+(r+1)]||''; try{ nx.focus({preventScroll:true}); }catch(_){} setActive(colName(c)+(r+1)); } }
+    recompute(); } }   // fertige Zelle zeigt ihr Ergebnis
+function applyInputMode(){ const m=keysOn?'none':'text';                 // Systemtastatur unterdrücken, solange die Formel-Tastatur offen ist
+  $('fx').inputMode=m; grid.querySelectorAll('input').forEach(i=>i.inputMode=m); }
+function setKeypad(on){ keysOn=!!on; buildKeypad();
+  $('keypad').classList.toggle('show',keysOn); $('btnKeys').classList.toggle('on',keysOn);
+  document.body.classList.toggle('kp-open',keysOn);
+  if(keysOn) document.documentElement.style.setProperty('--kph',($('keypad').offsetHeight+2)+'px');
+  applyInputMode();
+  if(keysOn){ const inp=inputOf(active); if(inp){ editEl=inp; inp.value=data[active]||''; try{ inp.focus({preventScroll:true}); }catch(_){} formulaUI(inp); } }
+  else ovPlace(); }
+$('btnKeys').onclick=()=>setKeypad(!keysOn);
+
+/* Finger-Modus: Auswählen/Ausfüllen (touch-action:none) ⇄ Scrollen */
+function setFingerMode(sel){ const w=$('wrap'); w.classList.toggle('noscroll',sel); const b=$('btnTouch'); b.classList.toggle('on',sel); b.innerHTML=sel?'👆<span class="lbl"> Auswählen</span>':'✋<span class="lbl"> Scrollen</span>'; }
+$('btnTouch').onclick=()=>setFingerMode(!$('wrap').classList.contains('noscroll'));
+setFingerMode(true);
+
+/* Eigenständig genutzt: zuletzt bearbeitete Tabelle aus dem Browser wiederherstellen */
+if(standalone){ try{ const raw=localStorage.getItem(AUTOKEY);
+    if(raw){ const d=JSON.parse(raw); if(d&&typeof d==='object'){ data=d; ROWS=Math.max(20,Math.min(1000,+data.rows||60)); } } }catch(e){} }
+build(); $('rowSel').value=String(ROWS); applyFont(); applyColWidths(); recompute(); setActive('A1'); updateUndoUI();
+try{ parent.postMessage({type:'embed-ready'},'*'); }catch(e){}
+</script>
+</body>
+</html>
